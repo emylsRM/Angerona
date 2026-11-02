@@ -1,0 +1,213 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/settings_root"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/page"
+    android:orientation="vertical">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="60dp"
+        android:background="@color/bar"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:paddingStart="4dp"
+        android:paddingEnd="16dp">
+
+        <ImageButton
+            android:id="@+id/back"
+            style="@style/Angerona.IconButton"
+            android:contentDescription="Indietro"
+            android:src="@drawable/ic_back" />
+
+        <TextView
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="8dp"
+            android:layout_weight="1"
+            android:fontFamily="sans-serif-medium"
+            android:text="Impostazioni"
+            android:textColor="@color/text"
+            android:textSize="19sp" />
+    </LinearLayout>
+
+    <ScrollView
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:fillViewport="true">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:padding="16dp">
+
+            <!-- DNS -->
+            <LinearLayout style="@style/Angerona.Section">
+                <TextView style="@style/Angerona.SectionTitle" android:text="DNS sicuro" />
+                <TextView style="@style/Angerona.Help" android:text="Le richieste DNS viaggiano cifrate dentro il browser. Se il DNS scelto non risponde, i siti non si aprono: nessun ripiego in chiaro." />
+                <TextView style="@style/Angerona.Label" android:text="Provider DNS" />
+                <Spinner
+                    android:id="@+id/spinner_dns"
+                    android:layout_width="match_parent"
+                    android:layout_height="48dp"
+                    android:layout_marginTop="4dp"
+                    android:background="@drawable/bg_input"
+                    android:popupBackground="@drawable/bg_popup" />
+                <LinearLayout
+                    android:id="@+id/group_nextdns"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical">
+                    <TextView style="@style/Angerona.Label" android:text="ID NextDNS" />
+                    <EditText
+                        android:id="@+id/input_nextdns"
+                        style="@style/Angerona.Input"
+                        android:hint="a1b2c3"
+                        android:importantForAutofill="no"
+                        android:inputType="textNoSuggestions" />
+                </LinearLayout>
+                <LinearLayout
+                    android:id="@+id/group_doh"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical">
+                    <TextView style="@style/Angerona.Label" android:text="Indirizzo DoH" />
+                    <EditText
+                        android:id="@+id/input_doh"
+                        style="@style/Angerona.Input"
+                        android:hint="https://dns.example/dns-query"
+                        android:importantForAutofill="no"
+                        android:inputType="textUri" />
+                </LinearLayout>
+            </LinearLayout>
+
+            <!-- Proxy -->
+            <LinearLayout style="@style/Angerona.Section">
+                <TextView style="@style/Angerona.SectionTitle" android:text="Proxy e VPN" />
+                <TextView style="@style/Angerona.Help" android:text="Con un'app VPN attiva (WireGuard, Mullvad, Proton…) non serve altro. Per far passare solo il browser da Tor o da un proxy usa SOCKS5, es. Orbot: 127.0.0.1 porta 9050. Se il proxy cade, la navigazione si ferma." />
+                <TextView style="@style/Angerona.Label" android:text="Tipo di proxy" />
+                <Spinner
+                    android:id="@+id/spinner_proxy"
+                    android:layout_width="match_parent"
+                    android:layout_height="48dp"
+                    android:layout_marginTop="4dp"
+                    android:background="@drawable/bg_input"
+                    android:popupBackground="@drawable/bg_popup" />
+                <LinearLayout
+                    android:id="@+id/group_proxy"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical">
+                    <TextView style="@style/Angerona.Label" android:text="Indirizzo" />
+                    <EditText
+                        android:id="@+id/input_host"
+                        style="@style/Angerona.Input"
+                        android:hint="127.0.0.1"
+                        android:importantForAutofill="no"
+                        android:inputType="textUri" />
+                    <TextView style="@style/Angerona.Label" android:text="Porta" />
+                    <EditText
+                        android:id="@+id/input_port"
+                        style="@style/Angerona.Input"
+                        android:hint="9050"
+                        android:importantForAutofill="no"
+                        android:inputType="number" />
+                    <TextView style="@style/Angerona.Label" android:text="Utente (facoltativo)" />
+                    <EditText
+                        android:id="@+id/input_user"
+                        style="@style/Angerona.Input"
+                        android:importantForAutofill="no"
+                        android:inputType="textNoSuggestions" />
+                    <TextView style="@style/Angerona.Label" android:text="Password" />
+                    <EditText
+                        android:id="@+id/input_pass"
+                        style="@style/Angerona.Input"
+                        android:importantForAutofill="no"
+                        android:inputType="textPassword" />
+                </LinearLayout>
+                <Button
+                    android:id="@+id/btn_check"
+                    style="@style/Angerona.Button"
+                    android:text="Verifica connessione" />
+            </LinearLayout>
+
+            <!-- Ricerca -->
+            <LinearLayout style="@style/Angerona.Section">
+                <TextView style="@style/Angerona.SectionTitle" android:text="Ricerca" />
+                <TextView style="@style/Angerona.Label" android:text="Motore di ricerca" />
+                <Spinner
+                    android:id="@+id/spinner_search"
+                    android:layout_width="match_parent"
+                    android:layout_height="48dp"
+                    android:layout_marginTop="4dp"
+                    android:background="@drawable/bg_input"
+                    android:popupBackground="@drawable/bg_popup" />
+                <LinearLayout
+                    android:id="@+id/group_searxng"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical">
+                    <TextView style="@style/Angerona.Label" android:text="Indirizzo della tua istanza SearXNG" />
+                    <EditText
+                        android:id="@+id/input_searxng"
+                        style="@style/Angerona.Input"
+                        android:hint="https://searx.example.org"
+                        android:importantForAutofill="no"
+                        android:inputType="textUri" />
+                </LinearLayout>
+            </LinearLayout>
+
+            <!-- Protezioni -->
+            <LinearLayout style="@style/Angerona.Section">
+                <TextView style="@style/Angerona.SectionTitle" android:text="Protezioni" />
+                <Switch android:id="@+id/switch_https" style="@style/Angerona.Switch" android:text="Solo HTTPS" />
+                <TextView style="@style/Angerona.Help" android:text="Apre i siti sempre in versione cifrata." />
+                <Switch android:id="@+id/switch_trackers" style="@style/Angerona.Switch" android:text="Protezione rigorosa dai tracker" />
+                <TextView style="@style/Angerona.Help" android:text="Blocca tracker, cryptominer, fingerprinting e tracciamento social. Se disattivata resta la protezione standard." />
+                <Switch android:id="@+id/switch_cookies" style="@style/Angerona.Switch" android:text="Blocca i cookie di terze parti" />
+                <TextView style="@style/Angerona.Help" android:text="Altrimenti i cookie esterni restano comunque isolati sito per sito." />
+                <Switch android:id="@+id/switch_js" style="@style/Angerona.Switch" android:text="JavaScript" />
+                <TextView style="@style/Angerona.Help" android:text="Disattivarlo è più sicuro ma molti siti smettono di funzionare." />
+                <Switch android:id="@+id/switch_secure" style="@style/Angerona.Switch" android:text="Nascondi lo schermo" />
+                <TextView style="@style/Angerona.Help" android:text="Impedisce screenshot e anteprime nelle app recenti." />
+            </LinearLayout>
+
+            <!-- Dati -->
+            <LinearLayout style="@style/Angerona.Section">
+                <TextView style="@style/Angerona.SectionTitle" android:text="Dati di navigazione" />
+                <TextView style="@style/Angerona.Help" android:text="Tutte le schede sono private: cookie, cache e cronologia spariscono quando le chiudi o esci." />
+                <Button
+                    android:id="@+id/btn_clear"
+                    style="@style/Angerona.Button"
+                    android:background="@drawable/bg_button_danger"
+                    android:text="Cancella tutto adesso"
+                    android:textColor="#FFF5C4B3" />
+            </LinearLayout>
+
+            <TextView
+                android:id="@+id/about"
+                style="@style/Angerona.Help"
+                android:gravity="center" />
+        </LinearLayout>
+    </ScrollView>
+
+    <LinearLayout
+        android:id="@+id/save_bar"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:background="@color/bar"
+        android:gravity="end"
+        android:orientation="horizontal"
+        android:padding="12dp">
+
+        <Button
+            android:id="@+id/btn_save"
+            style="@style/Angerona.Button"
+            android:layout_marginTop="0dp"
+            android:background="@drawable/bg_button_primary"
+            android:text="Salva e applica" />
+    </LinearLayout>
+</LinearLayout>

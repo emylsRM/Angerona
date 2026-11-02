@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Tema Notte -->
+<resources>
+    <color name="strip">#FF1C1846</color>
+    <color name="bar">#FF26215C</color>
+    <color name="field">#FF2F2970</color>
+    <color name="line">#FF3C3489</color>
+    <color name="accent">#FF7F77DD</color>
+    <color name="accent_strong">#FF534AB7</color>
+    <color name="text">#FFEEEDFE</color>
+    <color name="text2">#FFCECBF6</color>
+    <color name="muted">#FFAFA9EC</color>
+    <color name="page">#FF16132F</color>
+    <color name="ok">#FF5DCAA5</color>
+    <color name="warn">#FFF0997B</color>
+    <color name="ic_launcher_background">#FF26215C</color>
+</resources>

@@ -1,0 +1,175 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/root"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/strip"
+    android:orientation="vertical">
+
+    <FrameLayout
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:background="@color/page">
+
+        <org.mozilla.geckoview.GeckoView
+            android:id="@+id/gecko"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent" />
+
+        <ProgressBar
+            android:id="@+id/progress"
+            style="?android:attr/progressBarStyleHorizontal"
+            android:layout_width="match_parent"
+            android:layout_height="3dp"
+            android:layout_gravity="top"
+            android:indeterminate="false"
+            android:max="100"
+            android:progressBackgroundTint="@android:color/transparent"
+            android:progressTint="@color/accent"
+            android:visibility="gone" />
+    </FrameLayout>
+
+    <LinearLayout
+        android:id="@+id/findbar"
+        android:layout_width="match_parent"
+        android:layout_height="56dp"
+        android:background="@color/bar"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:paddingStart="10dp"
+        android:paddingEnd="4dp"
+        android:visibility="gone">
+
+        <EditText
+            android:id="@+id/find_input"
+            style="@style/Angerona.Input"
+            android:layout_width="0dp"
+            android:layout_height="40dp"
+            android:layout_marginTop="0dp"
+            android:layout_weight="1"
+            android:hint="Trova nella pagina"
+            android:imeOptions="actionSearch|flagNoExtractUi"
+            android:importantForAutofill="no"
+            android:inputType="text" />
+
+        <TextView
+            android:id="@+id/find_count"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:minWidth="64dp"
+            android:paddingStart="8dp"
+            android:paddingEnd="4dp"
+            android:gravity="center"
+            android:textColor="@color/muted"
+            android:textSize="12sp" />
+
+        <ImageButton
+            android:id="@+id/find_prev"
+            style="@style/Angerona.IconButton"
+            android:contentDescription="Precedente"
+            android:src="@drawable/ic_up" />
+
+        <ImageButton
+            android:id="@+id/find_next"
+            style="@style/Angerona.IconButton"
+            android:contentDescription="Successivo"
+            android:src="@drawable/ic_down" />
+
+        <ImageButton
+            android:id="@+id/find_close"
+            style="@style/Angerona.IconButton"
+            android:contentDescription="Chiudi ricerca"
+            android:src="@drawable/ic_close" />
+    </LinearLayout>
+
+    <LinearLayout
+        android:id="@+id/toolbar"
+        android:layout_width="match_parent"
+        android:layout_height="60dp"
+        android:background="@color/bar"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:paddingStart="8dp"
+        android:paddingEnd="2dp">
+
+        <LinearLayout
+            android:id="@+id/address_box"
+            android:layout_width="0dp"
+            android:layout_height="44dp"
+            android:layout_weight="1"
+            android:background="@drawable/bg_address"
+            android:gravity="center_vertical"
+            android:orientation="horizontal"
+            android:paddingStart="12dp"
+            android:paddingEnd="8dp">
+
+            <ImageView
+                android:id="@+id/site_state"
+                android:layout_width="18dp"
+                android:layout_height="18dp"
+                android:contentDescription="Stato della connessione"
+                android:src="@drawable/ic_search"
+                android:tint="@color/accent" />
+
+            <EditText
+                android:id="@+id/address"
+                android:layout_width="0dp"
+                android:layout_height="match_parent"
+                android:layout_marginStart="8dp"
+                android:layout_weight="1"
+                android:background="@null"
+                android:hint="Cerca o scrivi un indirizzo"
+                android:imeOptions="actionGo|flagNoExtractUi|flagNoPersonalizedLearning"
+                android:importantForAutofill="no"
+                android:inputType="textUri|textNoSuggestions"
+                android:selectAllOnFocus="true"
+                android:singleLine="true"
+                android:textColor="@color/text"
+                android:textColorHint="@color/muted"
+                android:textSize="15sp" />
+        </LinearLayout>
+
+        <TextView
+            android:id="@+id/shield"
+            android:layout_width="wrap_content"
+            android:layout_height="44dp"
+            android:layout_marginStart="4dp"
+            android:background="@drawable/bg_ripple_round"
+            android:drawableStart="@drawable/ic_shield_check"
+            android:drawablePadding="3dp"
+            android:drawableTint="@color/accent"
+            android:gravity="center_vertical"
+            android:minWidth="36dp"
+            android:paddingStart="8dp"
+            android:paddingEnd="6dp"
+            android:textColor="@color/text"
+            android:textSize="12sp" />
+
+        <FrameLayout
+            android:id="@+id/tabs_button"
+            android:layout_width="44dp"
+            android:layout_height="44dp"
+            android:background="@drawable/bg_ripple_round"
+            android:contentDescription="Schede">
+
+            <TextView
+                android:id="@+id/tab_count"
+                android:layout_width="24dp"
+                android:layout_height="24dp"
+                android:layout_gravity="center"
+                android:background="@drawable/bg_tabcount"
+                android:gravity="center"
+                android:text="1"
+                android:textColor="@color/text2"
+                android:textSize="12sp"
+                android:fontFamily="sans-serif-medium" />
+        </FrameLayout>
+
+        <ImageButton
+            android:id="@+id/menu"
+            style="@style/Angerona.IconButton"
+            android:contentDescription="Menu"
+            android:src="@drawable/ic_more" />
+    </LinearLayout>
+</LinearLayout>

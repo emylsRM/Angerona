@@ -1,0 +1,62 @@
+plugins {
+    id 'com.android.application'
+}
+
+android {
+    namespace = 'app.angerona.browser'
+    compileSdk = 37
+
+    defaultConfig {
+        applicationId = 'app.angerona.browser'
+        minSdk = 26
+        targetSdk = 36
+        versionCode = 1
+        versionName = '1.0.0'
+    }
+
+    // Firma stabile se nelle variabili d'ambiente c'è la tua chiave (vedi README);
+    // altrimenti si usa la chiave di debug, valida solo per uso personale.
+    signingConfigs {
+        release {
+            def ks = System.getenv('ANGERONA_KEYSTORE_FILE')
+            if (ks) {
+                storeFile = file(ks)
+                storePassword = System.getenv('ANGERONA_KEYSTORE_PASSWORD')
+                keyAlias = System.getenv('ANGERONA_KEY_ALIAS')
+                keyPassword = System.getenv('ANGERONA_KEY_PASSWORD')
+            }
+        }
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled = false
+            signingConfig = System.getenv('ANGERONA_KEYSTORE_FILE') ? signingConfigs.release : signingConfigs.debug
+        }
+    }
+
+    // Un APK per architettura: molto più leggero di un APK universale.
+    splits {
+        abi {
+            enable = true
+            reset()
+            include 'arm64-v8a', 'armeabi-v7a', 'x86_64'
+            universalApk = false
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility = JavaVersion.VERSION_17
+        targetCompatibility = JavaVersion.VERSION_17
+    }
+
+    packaging {
+        jniLibs {
+            useLegacyPackaging = true
+        }
+    }
+}
+
+dependencies {
+    implementation "org.mozilla.geckoview:geckoview:${geckoviewVersion}"
+}

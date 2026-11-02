@@ -1,0 +1,114 @@
+<!doctype html>
+<html lang="it">
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' data:; base-uri 'none'; form-action 'none'">
+  <title>Angerona</title>
+  <link rel="stylesheet" href="ui.css">
+</head>
+<body>
+  <div id="chrome">
+    <div id="tabstrip">
+      <img class="brand" src="icon.png" alt="" width="20" height="20">
+      <div id="tabs" role="tablist" aria-label="Schede"></div>
+      <button id="new-tab" class="icon-btn" title="Nuova scheda (Ctrl+T)" aria-label="Nuova scheda"></button>
+      <div class="drag-fill"></div>
+    </div>
+    <div id="toolbar">
+      <button id="back" class="icon-btn" title="Indietro (Alt+←)" aria-label="Indietro"></button>
+      <button id="forward" class="icon-btn" title="Avanti (Alt+→)" aria-label="Avanti"></button>
+      <button id="reload" class="icon-btn" title="Ricarica (F5)" aria-label="Ricarica"></button>
+      <button id="home" class="icon-btn" title="Pagina iniziale" aria-label="Pagina iniziale"></button>
+      <label id="address-wrap">
+        <span id="site-state" aria-hidden="true"></span>
+        <input id="address" type="text" spellcheck="false" autocomplete="off" placeholder="Cerca o scrivi un indirizzo" aria-label="Indirizzo">
+        <button id="zoom" type="button" class="zoom" hidden title="Ripristina zoom (Ctrl+0)"></button>
+      </label>
+      <span id="notice" role="status" aria-live="polite"></span>
+      <button id="shield" class="shield" title="Tracker bloccati in questa pagina"></button>
+      <button id="open-settings" class="icon-btn" title="Impostazioni (Ctrl+,)" aria-label="Impostazioni"></button>
+    </div>
+    <div id="findbar" hidden>
+      <input id="find-input" type="text" spellcheck="false" placeholder="Trova nella pagina" aria-label="Trova nella pagina">
+      <span id="find-count"></span>
+      <button id="find-prev" class="icon-btn" title="Precedente (Maiusc+Invio)" aria-label="Precedente"></button>
+      <button id="find-next" class="icon-btn" title="Successivo (Invio)" aria-label="Successivo"></button>
+      <button id="find-close" class="icon-btn" title="Chiudi (Esc)" aria-label="Chiudi ricerca"></button>
+    </div>
+  </div>
+
+  <section id="panel" hidden aria-label="Impostazioni">
+    <div class="panel-inner">
+      <header class="panel-head">
+        <img src="icon.png" alt="" width="40" height="40">
+        <div>
+          <h1>Impostazioni</h1>
+          <p class="muted">Le modifiche valgono subito per tutte le schede.</p>
+        </div>
+        <button id="close-settings" class="icon-btn big" aria-label="Chiudi impostazioni"></button>
+      </header>
+
+      <form id="settings-form" novalidate>
+        <div class="card">
+          <h2>DNS sicuro</h2>
+          <p class="muted">Le richieste DNS viaggiano cifrate. Se il DNS scelto non risponde, i siti non si aprono: nessun ripiego in chiaro.</p>
+          <label class="field"><span>Provider DNS</span><select name="dns"></select></label>
+          <label class="field" data-show="dns=nextdns"><span>ID NextDNS</span><input name="nextdnsId" placeholder="a1b2c3"><em data-error="nextdnsId"></em></label>
+          <label class="field" data-show="dns=custom"><span>Indirizzo DoH</span><input name="customDoh" placeholder="https://dns.example/dns-query"><em data-error="customDoh"></em></label>
+        </div>
+
+        <div class="card">
+          <h2>Proxy e VPN</h2>
+          <p class="muted">Con una VPN attiva sul computer non serve altro. Per far passare solo il browser da una VPN o da Tor, usa il suo proxy SOCKS5 (Mullvad: 10.64.0.1 porta 1080, Tor: 127.0.0.1 porta 9050). Se il proxy cade, la navigazione si ferma.</p>
+          <label class="field"><span>Tipo di proxy</span><select name="proxyMode"></select></label>
+          <div class="row" data-show="proxyMode!=none">
+            <label class="field grow"><span>Indirizzo</span><input name="proxyHost" placeholder="127.0.0.1"><em data-error="proxyHost"></em></label>
+            <label class="field port"><span>Porta</span><input name="proxyPort" inputmode="numeric" placeholder="1080"><em data-error="proxyPort"></em></label>
+          </div>
+          <div class="row" data-show="proxyMode=http,https">
+            <label class="field grow"><span>Utente (facoltativo)</span><input name="proxyUser" autocomplete="off"></label>
+            <label class="field grow"><span>Password</span><input name="proxyPass" type="password" autocomplete="off"></label>
+          </div>
+          <p class="muted small" data-show="proxyMode=socks5">Il motore Chromium non supporta SOCKS5 con password: usa un proxy SOCKS5 senza accesso o un proxy HTTP.</p>
+          <div class="actions">
+            <button type="button" id="check-net" class="btn ghost">Verifica connessione</button>
+            <span id="net-result" class="muted small"></span>
+          </div>
+        </div>
+
+        <div class="card">
+          <h2>Ricerca</h2>
+          <label class="field"><span>Motore di ricerca</span><select name="search"></select></label>
+          <label class="field" data-show="search=searxng"><span>Indirizzo della tua istanza SearXNG</span><input name="searxngUrl" placeholder="https://searx.example.org"><em data-error="searxngUrl"></em></label>
+        </div>
+
+        <div class="card">
+          <h2>Protezioni</h2>
+          <label class="toggle"><input type="checkbox" name="httpsOnly"><span><b>Solo HTTPS</b><small>Apre i siti sempre in versione cifrata. Se un sito non la offre, te lo chiede.</small></span></label>
+          <label class="toggle"><input type="checkbox" name="blockTrackers"><span><b>Blocca tracker e pubblicità</b><small id="filters-info">Liste EasyList ed EasyPrivacy.</small></span></label>
+          <label class="toggle"><input type="checkbox" name="blockThirdPartyCookies"><span><b>Blocca i cookie di terze parti</b><small>Impedisce ai siti esterni di seguirti di pagina in pagina. Qualche accesso incorporato potrebbe non funzionare.</small></span></label>
+          <label class="toggle"><input type="checkbox" name="javascript"><span><b>JavaScript</b><small>Disattivarlo rende la navigazione più sicura ma molti siti smettono di funzionare. Vale per le nuove schede.</small></span></label>
+          <div class="actions">
+            <button type="button" id="update-filters" class="btn ghost">Aggiorna liste dei tracker</button>
+          </div>
+        </div>
+
+        <div class="card">
+          <h2>Dati di navigazione</h2>
+          <p class="muted">Cookie, cache e cronologia restano solo in memoria e spariscono alla chiusura. Puoi cancellarli anche adesso.</p>
+          <div class="actions">
+            <button type="button" id="clear-data" class="btn danger">Cancella tutto adesso</button>
+          </div>
+        </div>
+
+        <div class="save-bar">
+          <span id="about" class="muted small"></span>
+          <button type="submit" class="btn primary">Salva e applica</button>
+        </div>
+      </form>
+    </div>
+  </section>
+
+  <script src="ui.js"></script>
+</body>
+</html>

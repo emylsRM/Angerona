@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Angerona: dito sulle labbra sigillate. Disegnato in coordinate 512 e scalato nell'area sicura 108dp. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp" android:height="108dp" android:viewportWidth="108" android:viewportHeight="108">
+    <group android:scaleX="0.2" android:scaleY="0.2" android:translateX="2.8" android:translateY="1.6">
+        <path android:strokeColor="#FF3C3489" android:strokeWidth="8" android:fillColor="#00000000"
+            android:pathData="M64,262A192,192 0,1 0,448 262A192,192 0,1 0,64 262Z" />
+        <path android:fillColor="#FFCECBF6"
+            android:pathData="M116,300C146,268 178,238 212,236C232,235 246,248 256,256C266,248 280,235 300,236C334,238 366,268 396,300C356,346 304,372 256,372C208,372 156,346 116,300Z" />
+        <path android:strokeColor="#FF26215C" android:strokeWidth="12" android:strokeLineCap="round" android:fillColor="#00000000"
+            android:pathData="M140,302C196,318 316,318 372,302" />
+        <path android:strokeColor="#FF26215C" android:strokeWidth="58" android:strokeLineCap="round"
+            android:pathData="M256,116L256,408" />
+        <path android:strokeColor="#FF7F77DD" android:strokeWidth="30" android:strokeLineCap="round"
+            android:pathData="M256,116L256,408" />
+    </group>
+</vector>

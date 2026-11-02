@@ -1,0 +1,78 @@
+{
+  "name": "angerona",
+  "productName": "Angerona",
+  "version": "1.0.0",
+  "description": "Browser privato e leggero: DNS cifrato, proxy, blocco tracker, nessuna traccia alla chiusura.",
+  "main": "src/main.js",
+  "author": "Angerona",
+  "license": "MIT",
+  "private": true,
+  "scripts": {
+    "start": "electron .",
+    "icons": "node scripts/make-icons.mjs",
+    "filters": "node scripts/build-filters.mjs",
+    "check": "node --check src/main.js && node --check src/privacy.js && node --check src/settings.js && node --check src/pages.js && node --check ui/ui.js && node --check ui/preload.js",
+    "dist:win": "electron-builder --win --x64",
+    "dist:linux": "electron-builder --linux AppImage --x64"
+  },
+  "dependencies": {
+    "@ghostery/adblocker": "2.20.3",
+    "tldts": "7.4.19"
+  },
+  "devDependencies": {
+    "@resvg/resvg-js": "2.6.2",
+    "electron": "45.2.1",
+    "electron-builder": "26.18.0",
+    "png-to-ico": "3.0.2"
+  },
+  "build": {
+    "appId": "app.angerona.browser",
+    "productName": "Angerona",
+    "copyright": "Angerona",
+    "files": [
+      "src/**",
+      "ui/**",
+      "resources/**",
+      "build/icon.png",
+      "build/icon.svg",
+      "package.json"
+    ],
+    "directories": {
+      "output": "dist",
+      "buildResources": "build"
+    },
+    "electronLanguages": [
+      "it",
+      "en-US"
+    ],
+    "compression": "maximum",
+    "publish": null,
+    "win": {
+      "icon": "build/icon.ico",
+      "target": [
+        "nsis",
+        "portable"
+      ]
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "shortcutName": "Angerona",
+      "deleteAppDataOnUninstall": true,
+      "installerLanguages": [
+        "it_IT"
+      ],
+      "artifactName": "Angerona-Setup-${version}.${ext}"
+    },
+    "portable": {
+      "artifactName": "Angerona-Portable-${version}.${ext}"
+    },
+    "linux": {
+      "icon": "build/icon.png",
+      "category": "Network",
+      "target": "AppImage"
+    }
+  }
+}
