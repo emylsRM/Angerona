@@ -28,6 +28,11 @@
       <button id="shield" class="shield" title="Tracker bloccati in questa pagina"></button>
       <button id="open-settings" class="icon-btn" title="Impostazioni (Ctrl+,)" aria-label="Impostazioni"></button>
     </div>
+    <div id="updatebar" hidden role="status">
+      <span id="update-text"></span>
+      <button type="button" id="update-now" class="btn primary small">Aggiorna ora</button>
+      <button type="button" id="update-later" class="btn ghost small">Più tardi</button>
+    </div>
     <div id="findbar" hidden>
       <input id="find-input" type="text" spellcheck="false" placeholder="Trova nella pagina" aria-label="Trova nella pagina">
       <span id="find-count"></span>
@@ -120,6 +125,15 @@
           <p class="muted">Cookie, cache e cronologia restano solo in memoria e spariscono alla chiusura. Puoi cancellarli anche adesso.</p>
           <div class="actions">
             <button type="button" id="clear-data" class="btn danger">Cancella tutto adesso</button>
+          </div>
+        </div>
+
+        <div class="card">
+          <h2>Aggiornamenti</h2>
+          <label class="toggle"><input type="checkbox" name="checkUpdates"><span><b>Controlla gli aggiornamenti all'avvio</b><small>Chiede a GitHub se c'è una nuova versione, passando dal DNS cifrato e dal proxy che hai scelto. L'installer scaricato viene verificato prima di avviarlo.</small></span></label>
+          <div class="actions">
+            <button type="button" id="check-update" class="btn ghost">Controlla ora</button>
+            <span id="update-result" class="muted small"></span>
           </div>
         </div>
 

@@ -38,6 +38,7 @@ public class SettingsActivity extends Activity {
     private Switch cookies;
     private Switch js;
     private Switch secure;
+    private Switch updates;
     private TextView scoreValue;
     private TextView scoreLevel;
     private TextView tipsTitle;
@@ -77,6 +78,7 @@ public class SettingsActivity extends Activity {
         cookies = findViewById(R.id.switch_cookies);
         js = findViewById(R.id.switch_js);
         secure = findViewById(R.id.switch_secure);
+        updates = findViewById(R.id.switch_updates);
         scoreValue = findViewById(R.id.score_value);
         scoreLevel = findViewById(R.id.score_level);
         tipsTitle = findViewById(R.id.tips_title);
@@ -104,6 +106,7 @@ public class SettingsActivity extends Activity {
         cookies.setChecked(s.blockThirdPartyCookies);
         js.setChecked(s.javascript);
         secure.setChecked(s.secureScreen);
+        updates.setChecked(s.checkUpdates);
 
         AdapterView.OnItemSelectedListener refresh = new AdapterView.OnItemSelectedListener() {
             @Override public void onItemSelected(AdapterView<?> parent, View view, int position, long id) { updateVisibility(); updateReport(); }
@@ -123,7 +126,13 @@ public class SettingsActivity extends Activity {
         updateVisibility();
         updateReport();
 
-        ((TextView) findViewById(R.id.about)).setText("Angerona 1.0.0 · motore Firefox (GeckoView)");
+        ((TextView) findViewById(R.id.about)).setText("Angerona " + Updater.installedVersion(this) + " · motore Firefox (GeckoView)");
+        findViewById(R.id.btn_update).setOnClickListener(v -> {
+            if (save()) {
+                setResult(RESULT_OK, new Intent().putExtra(MainActivity.EXTRA_ACTION, "update"));
+                finish();
+            }
+        });
 
         findViewById(R.id.back).setOnClickListener(v -> finish());
         findViewById(R.id.btn_save).setOnClickListener(v -> {
@@ -213,6 +222,7 @@ public class SettingsActivity extends Activity {
         s.blockThirdPartyCookies = cookies.isChecked();
         s.javascript = js.isChecked();
         s.secureScreen = secure.isChecked();
+        s.checkUpdates = updates.isChecked();
         return s;
     }
 

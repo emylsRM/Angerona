@@ -12,8 +12,9 @@ android {
         applicationId = 'app.angerona.browser'
         minSdk = 26
         targetSdk = 36
-        versionCode = 1
-        versionName = '1.0.0'
+        // Impostati da GitHub Actions a ogni compilazione (vedi .github/workflows/main.yml)
+        versionCode = (System.getenv('ANGERONA_VERSION_CODE') ?: '1') as Integer
+        versionName = System.getenv('ANGERONA_VERSION') ?: '1.0.0'
     }
 
     // Firma stabile se nelle variabili d'ambiente c'è la tua chiave (vedi README);

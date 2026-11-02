@@ -259,6 +259,17 @@
                     android:textColor="#FFF5C4B3" />
             </LinearLayout>
 
+            <!-- Aggiornamenti -->
+            <LinearLayout style="@style/Angerona.Section">
+                <TextView style="@style/Angerona.SectionTitle" android:text="Aggiornamenti" />
+                <Switch android:id="@+id/switch_updates" style="@style/Angerona.Switch" android:text="Controlla all'apertura" />
+                <TextView style="@style/Angerona.Help" android:text="Chiede a GitHub se c'è una nuova versione, passando dal DNS cifrato e dal proxy che hai scelto." />
+                <Button
+                    android:id="@+id/btn_update"
+                    style="@style/Angerona.Button"
+                    android:text="Controlla ora" />
+            </LinearLayout>
+
             <TextView
                 android:id="@+id/about"
                 style="@style/Angerona.Help"

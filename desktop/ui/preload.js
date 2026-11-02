@@ -6,9 +6,9 @@ const INVOKE = new Set([
   'tab:new', 'tab:close', 'tab:activate', 'tab:navigate', 'tab:back', 'tab:forward',
   'tab:reload', 'tab:stop', 'tab:home', 'tab:zoom-reset', 'ui:chrome-height', 'ui:panel',
   'find:start', 'find:stop', 'settings:get', 'settings:set', 'net:check', 'filters:update', 'data:clear',
-  'privacy:evaluate', 'tab:open-test',
+  'privacy:evaluate', 'tab:open-test', 'update:check', 'update:install',
 ]);
-const EVENTS = new Set(['tabs', 'find', 'toast', 'focus-address', 'open-find', 'open-panel', 'settings', 'fullscreen']);
+const EVENTS = new Set(['tabs', 'find', 'toast', 'focus-address', 'open-find', 'open-panel', 'settings', 'fullscreen', 'update']);
 
 contextBridge.exposeInMainWorld('angerona', {
   invoke(channel, ...args) {

@@ -54,6 +54,7 @@ public class MainActivity extends Activity {
 
     private Engine engine;
     private Prompts prompts;
+    private Updater updater;
     private GeckoView geckoView;
     private EditText address;
     private ImageView siteState;
@@ -95,6 +96,7 @@ public class MainActivity extends Activity {
 
         engine = Engine.get(this);
         prompts = new Prompts(this);
+        updater = new Updater(this, engine, url -> newTab(url, true, true));
         pendingUrl = urlFromIntent(getIntent());
         // Nessuna pagina parte prima che il proxy (o la sua assenza) sia applicato.
         engine.whenReady(ok -> {
@@ -112,6 +114,9 @@ public class MainActivity extends Activity {
             }
             newTab(pendingUrl, true, true);
             pendingUrl = null;
+            if (engine.settings().checkUpdates) {
+                geckoView.postDelayed(() -> { if (!isFinishing()) updater.check(false); }, 5000);
+            }
         });
     }
 
@@ -780,6 +785,8 @@ public class MainActivity extends Activity {
                 newTab(CHECK_URL, true, true);
             } else if ("open".equals(action) && isPrivacyTest(data.getStringExtra(EXTRA_URL))) {
                 newTab(data.getStringExtra(EXTRA_URL), true, true);
+            } else if ("update".equals(action)) {
+                updater.check(true);
             } else if ("clear".equals(action)) {
                 clearAll(false);
             } else if (resultCode == RESULT_OK) {

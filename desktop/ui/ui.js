@@ -300,7 +300,7 @@
     el.proxyPass.value = s.proxy.pass;
     el.search.value = s.search;
     el.searxngUrl.value = s.searxngUrl;
-    for (const k of ['httpsOnly', 'blockTrackers', 'blockThirdPartyCookies', 'javascript']) el[k].checked = s[k];
+    for (const k of ['httpsOnly', 'blockTrackers', 'blockThirdPartyCookies', 'javascript', 'checkUpdates']) el[k].checked = s[k];
     $('#filters-info').textContent = filtersText(p.filters);
     $('#about').textContent = `Angerona ${p.version} · ${p.engine}`;
     clearErrors();
@@ -327,6 +327,7 @@
       blockTrackers: el.blockTrackers.checked,
       blockThirdPartyCookies: el.blockThirdPartyCookies.checked,
       javascript: el.javascript.checked,
+      checkUpdates: el.checkUpdates.checked,
     };
   }
 
@@ -441,6 +442,25 @@
     closePanel();
     notice('Dati di navigazione cancellati');
   });
+
+  // ---------- Aggiornamenti ----------
+  const updatebar = $('#updatebar');
+  api.on('update', (u) => {
+    $('#update-text').textContent = `È disponibile Angerona ${u.version} (hai la ${u.current}).`;
+    $('#update-now').textContent = u.portable ? 'Scarica' : 'Aggiorna ora';
+    updatebar.hidden = false;
+  });
+  $('#update-now').addEventListener('click', () => { updatebar.hidden = true; api.invoke('update:install'); });
+  $('#update-later').addEventListener('click', () => { updatebar.hidden = true; });
+  $('#check-update').addEventListener('click', (e) => busy(e.currentTarget, async () => {
+    const out = $('#update-result');
+    out.className = 'muted small';
+    out.textContent = 'Controllo in corso…';
+    const r = await api.invoke('update:check');
+    if (!r.ok) { out.className = 'small net-bad'; out.textContent = 'GitHub non raggiungibile: controlla connessione, proxy o DNS.'; return; }
+    out.className = r.available ? 'small net-ok' : 'muted small';
+    out.textContent = r.available ? `Nuova versione ${r.version}: usa la barra in alto per installarla.` : `Hai già l'ultima versione (${r.current}).`;
+  }));
 
   document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape' && !panel.hidden) closePanel();

@@ -7,6 +7,7 @@ Browser privato e leggero per **Windows** e **Android**, con il nome della dea r
 - **Ricerca privata**: DuckDuckGo, Startpage, Brave Search, Mojeek, Qwant o la tua istanza SearXNG.
 - **Nessuna traccia**: tutte le schede sono private. Cookie, cache e cronologia restano solo in memoria e spariscono alla chiusura.
 - **Punteggio privacy**: nelle impostazioni un valore da 0 a 100 che cambia mentre modifichi le opzioni, con la spiegazione di cosa vedono i siti, il tuo operatore, il servizio DNS e il proxy. Da lì apri anche i test indipendenti (Mullvad, EFF Cover Your Tracks, BrowserLeaks).
+- **Aggiornamenti**: all'apertura avvisa se su GitHub c'è una versione nuova e la installa con un tocco, verificandone l'integrità.
 - **Protezioni**: blocco di tracker e pubblicità, cookie di terze parti bloccati, solo HTTPS, Global Privacy Control, nessun permesso a fotocamera, microfono, posizione e notifiche.
 
 | | Windows | Android |
@@ -39,11 +40,19 @@ L'APK si compila gratis su GitHub (servono solo un account e pochi minuti):
 
 In alternativa apri la cartella `android` con Android Studio e usa **Build → Build APK(s)**.
 
-Ogni lunedì GitHub ricompila da solo con l'ultimo motore Firefox. Per pubblicare una versione con gli installer allegati crea un tag che inizia con `v` (es. `v1.0.1`).
+Ogni compilazione su `main` (e ogni lunedì, con l'ultimo motore Firefox) pubblica da sola una nuova versione nella sezione **Releases**, numerata `1.0.N`, con APK, installer Windows e impronte SHA-256.
+
+### Aggiornamenti automatici
+
+All'apertura Angerona chiede a GitHub se c'è una versione più recente, passando dal DNS cifrato e dal proxy scelti, e propone l'aggiornamento:
+- **Windows**: scarica l'installer, controlla che l'impronta SHA-256 sia quella pubblicata e lo avvia.
+- **Android**: scarica l'APK adatto al processore del telefono e apre l'installer di sistema (la prima volta Android chiede di consentire l'installazione da Angerona).
+
+Si può disattivare nelle impostazioni, dove c'è anche il pulsante **Controlla ora**. Perché funzioni il repository deve essere pubblico.
 
 ### Firma stabile (consigliata)
 
-Senza una chiave tua ogni compilazione è firmata con una chiave temporanea, e per aggiornare l'app bisogna disinstallarla prima. Per aggiornare senza disinstallare, crea una chiave una volta sola:
+Senza una chiave tua ogni compilazione è firmata con una chiave temporanea: Android rifiuta l'aggiornamento e bisogna disinstallare l'app prima. Con la chiave stabile gli aggiornamenti si installano sopra la versione esistente, mantenendo le impostazioni. Per crearla una volta sola:
 
 ```
 keytool -genkeypair -v -keystore angerona.jks -alias angerona -keyalg RSA -keysize 4096 -validity 10000

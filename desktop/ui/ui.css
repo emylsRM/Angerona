@@ -105,6 +105,14 @@ svg { display: block; }
 }
 #notice.show { opacity: 1; }
 
+/* ---------- Avviso aggiornamento ---------- */
+#updatebar {
+  min-height: 40px; display: flex; align-items: center; gap: 10px; padding: 4px 12px;
+  background: #2F2970; border-bottom: 1px solid var(--accent); color: var(--text); font-size: 13px;
+}
+#update-text { flex: 1; }
+.btn.small { height: 28px; padding: 0 12px; font-size: 12.5px; }
+
 /* ---------- Trova nella pagina ---------- */
 #findbar {
   height: 38px; display: flex; align-items: center; gap: 4px; padding: 0 8px 0 12px;
