@@ -49,10 +49,12 @@ import java.util.Locale;
 public class MainActivity extends Activity {
     private static final int REQUEST_SETTINGS = 4202;
     static final String EXTRA_ACTION = "angerona.action";
+    static final String EXTRA_URL = "angerona.url";
     static final String CHECK_URL = "https://mullvad.net/it/check";
 
     private Engine engine;
     private Prompts prompts;
+    private Updater updater;
     private GeckoView geckoView;
     private EditText address;
     private ImageView siteState;
@@ -94,6 +96,7 @@ public class MainActivity extends Activity {
 
         engine = Engine.get(this);
         prompts = new Prompts(this);
+        updater = new Updater(this, engine, url -> newTab(url, true, true));
         pendingUrl = urlFromIntent(getIntent());
         // Nessuna pagina parte prima che il proxy (o la sua assenza) sia applicato.
         engine.whenReady(ok -> {
@@ -111,6 +114,9 @@ public class MainActivity extends Activity {
             }
             newTab(pendingUrl, true, true);
             pendingUrl = null;
+            if (engine.settings().checkUpdates) {
+                geckoView.postDelayed(() -> { if (!isFinishing()) updater.check(false); }, 5000);
+            }
         });
     }
 
@@ -600,7 +606,7 @@ public class MainActivity extends Activity {
         m.add(0, M_NEW, 3, "Nuova scheda");
         m.add(0, M_HOME, 4, "Pagina iniziale");
         m.add(0, M_FIND, 5, "Trova nella pagina");
-        m.add(0, M_CHECK, 6, "Verifica connessione");
+        m.add(0, M_CHECK, 6, "Test della privacy");
         m.add(0, M_SETTINGS, 7, "Impostazioni");
         m.add(0, M_CLEAR_EXIT, 8, "Cancella tutto ed esci");
         menu.setOnMenuItemClickListener(item -> {
@@ -617,13 +623,28 @@ public class MainActivity extends Activity {
                 case M_NEW: newTab(null, true, true); focusAddress(); return true;
                 case M_HOME: if (current != null) loadStart(current); return true;
                 case M_FIND: openFind(); return true;
-                case M_CHECK: newTab(CHECK_URL, true, true); return true;
+                case M_CHECK: showPrivacyTests(); return true;
                 case M_SETTINGS: startActivityForResult(new Intent(this, SettingsActivity.class), REQUEST_SETTINGS); return true;
                 case M_CLEAR_EXIT: clearAll(true); return true;
                 default: return false;
             }
         });
         menu.show();
+    }
+
+    private void showPrivacyTests() {
+        String[] names = new String[PrivacyReport.TESTS.length];
+        for (int i = 0; i < names.length; i++) names[i] = PrivacyReport.TESTS[i][0];
+        int score = PrivacyReport.evaluate(engine.settings()).score;
+        new AlertDialog.Builder(this)
+            .setTitle("Test della privacy · punteggio " + score + "/100")
+            .setItems(names, (d, which) -> newTab(PrivacyReport.TESTS[which][1], true, true))
+            .show();
+    }
+
+    private static boolean isPrivacyTest(String url) {
+        for (String[] t : PrivacyReport.TESTS) if (t[1].equals(url)) return true;
+        return false;
     }
 
     /** Chiude tutte le schede e cancella cookie, cache e dati dei siti. */
@@ -762,6 +783,10 @@ public class MainActivity extends Activity {
             String action = data == null ? null : data.getStringExtra(EXTRA_ACTION);
             if ("check".equals(action)) {
                 newTab(CHECK_URL, true, true);
+            } else if ("open".equals(action) && isPrivacyTest(data.getStringExtra(EXTRA_URL))) {
+                newTab(data.getStringExtra(EXTRA_URL), true, true);
+            } else if ("update".equals(action)) {
+                updater.check(true);
             } else if ("clear".equals(action)) {
                 clearAll(false);
             } else if (resultCode == RESULT_OK) {

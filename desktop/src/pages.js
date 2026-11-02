@@ -3,6 +3,7 @@
 const fs = require('node:fs');
 const path = require('node:path');
 const { DNS_PROVIDERS, SEARCH_ENGINES, PROXY_MODES } = require('./settings');
+const report = require('./report');
 
 const ICON = `data:image/svg+xml;base64,${fs.readFileSync(path.join(__dirname, '..', 'build', 'icon.svg')).toString('base64')}`;
 const CSP = "default-src 'none'; style-src 'unsafe-inline'; img-src data:; form-action https: http:; base-uri 'none'";
@@ -28,6 +29,7 @@ button:hover, .btn:hover { background: #7F77DD; }
 .chip { background: #26215C; border: 1px solid #3C3489; border-radius: 999px; padding: 4px 12px; font-size: 12.5px; color: #CECBF6; }
 .chip b { font-weight: 500; color: #EEEDFE; }
 .warn { border-color: #993C1D; }
+.score { border-color: #7F77DD; }
 .actions { display: flex; gap: 10px; justify-content: center; margin-top: 24px; flex-wrap: wrap; }
 .actions .btn { padding: 10px 18px; border-radius: 10px; display: inline-block; }
 .actions .ghost { background: transparent; border: 1px solid #3C3489; }
@@ -67,6 +69,7 @@ function startPage(s, privacy) {
       <button type="submit">Cerca</button>
     </form>
     <div class="chips">
+      <span class="chip score">Privacy <b>${report.evaluate(s).score}/100</b></span>
       <span class="chip ${s.dns === 'system' ? 'warn' : ''}">DNS <b>${esc(dnsLabel)}</b></span>
       <span class="chip">Proxy <b>${esc(proxy)}</b></span>
       <span class="chip">Tracker <b>${s.blockTrackers ? esc(rules) : 'non bloccati'}</b></span>

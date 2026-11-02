@@ -28,6 +28,11 @@
       <button id="shield" class="shield" title="Tracker bloccati in questa pagina"></button>
       <button id="open-settings" class="icon-btn" title="Impostazioni (Ctrl+,)" aria-label="Impostazioni"></button>
     </div>
+    <div id="updatebar" hidden role="status">
+      <span id="update-text"></span>
+      <button type="button" id="update-now" class="btn primary small">Aggiorna ora</button>
+      <button type="button" id="update-later" class="btn ghost small">Più tardi</button>
+    </div>
     <div id="findbar" hidden>
       <input id="find-input" type="text" spellcheck="false" placeholder="Trova nella pagina" aria-label="Trova nella pagina">
       <span id="find-count"></span>
@@ -49,6 +54,32 @@
       </header>
 
       <form id="settings-form" novalidate>
+        <div class="card privacy" id="privacy-card">
+          <div class="privacy-head">
+            <div class="score-ring" id="score-ring"><span id="score-value">0</span><small>/100</small></div>
+            <div class="grow">
+              <h2>La tua privacy: <span id="score-level"></span></h2>
+              <p class="muted small">Il punteggio cambia mentre modifichi le impostazioni qui sotto. Salva per applicarle.</p>
+            </div>
+          </div>
+          <div id="observers" class="observers"></div>
+          <div id="tips-box" class="tips">
+            <h3>Per migliorare</h3>
+            <ul id="tips"></ul>
+          </div>
+          <p class="muted small" id="vpn-note">Se hai una VPN attiva sul computer il tuo IP è già nascosto: la verifica reale te lo conferma.</p>
+          <div class="actions">
+            <button type="button" id="check-net" class="btn ghost">Verifica reale</button>
+            <span id="net-result" class="muted small"></span>
+          </div>
+          <div class="actions tests">
+            <span class="muted small">Test completi in una nuova scheda:</span>
+            <button type="button" class="chip-btn" data-test="mullvad">Mullvad</button>
+            <button type="button" class="chip-btn" data-test="eff">Cover Your Tracks</button>
+            <button type="button" class="chip-btn" data-test="browserleaks">BrowserLeaks</button>
+          </div>
+        </div>
+
         <div class="card">
           <h2>DNS sicuro</h2>
           <p class="muted">Le richieste DNS viaggiano cifrate. Se il DNS scelto non risponde, i siti non si aprono: nessun ripiego in chiaro.</p>
@@ -70,10 +101,6 @@
             <label class="field grow"><span>Password</span><input name="proxyPass" type="password" autocomplete="off"></label>
           </div>
           <p class="muted small" data-show="proxyMode=socks5">Il motore Chromium non supporta SOCKS5 con password: usa un proxy SOCKS5 senza accesso o un proxy HTTP.</p>
-          <div class="actions">
-            <button type="button" id="check-net" class="btn ghost">Verifica connessione</button>
-            <span id="net-result" class="muted small"></span>
-          </div>
         </div>
 
         <div class="card">
@@ -101,8 +128,17 @@
           </div>
         </div>
 
+        <div class="card">
+          <h2>Aggiornamenti</h2>
+          <label class="toggle"><input type="checkbox" name="checkUpdates"><span><b>Controlla gli aggiornamenti all'avvio</b><small>Chiede a GitHub se c'è una nuova versione, passando dal DNS cifrato e dal proxy che hai scelto. L'installer scaricato viene verificato prima di avviarlo.</small></span></label>
+          <div class="actions">
+            <button type="button" id="check-update" class="btn ghost">Controlla ora</button>
+            <span id="update-result" class="muted small"></span>
+          </div>
+        </div>
+
         <div class="save-bar">
-          <span id="about" class="muted small"></span>
+          <span class="save-info"><span id="score-mini" class="score-mini"></span><span id="about" class="muted small"></span></span>
           <button type="submit" class="btn primary">Salva e applica</button>
         </div>
       </form>

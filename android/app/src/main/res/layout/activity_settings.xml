@@ -44,6 +44,82 @@
             android:orientation="vertical"
             android:padding="16dp">
 
+            <!-- Privacy -->
+            <LinearLayout
+                android:id="@+id/privacy_card"
+                style="@style/Angerona.Section">
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal">
+                    <TextView
+                        android:id="@+id/score_value"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:fontFamily="sans-serif-medium"
+                        android:textColor="@color/accent"
+                        android:textSize="40sp" />
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginEnd="14dp"
+                        android:text="/100"
+                        android:textColor="@color/muted"
+                        android:textSize="14sp" />
+                    <LinearLayout
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:orientation="vertical">
+                        <TextView
+                            android:id="@+id/score_level"
+                            style="@style/Angerona.SectionTitle"
+                            android:layout_marginBottom="0dp" />
+                        <TextView
+                            style="@style/Angerona.Help"
+                            android:layout_marginBottom="0dp"
+                            android:text="Il punteggio cambia mentre modifichi le impostazioni qui sotto." />
+                    </LinearLayout>
+                </LinearLayout>
+                <LinearLayout
+                    android:id="@+id/observers_box"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="10dp"
+                    android:orientation="vertical" />
+                <TextView
+                    android:id="@+id/tips_title"
+                    style="@style/Angerona.SectionTitle"
+                    android:layout_marginTop="6dp"
+                    android:textSize="14sp"
+                    android:text="Per migliorare" />
+                <LinearLayout
+                    android:id="@+id/tips_box"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical" />
+                <TextView
+                    android:id="@+id/vpn_note"
+                    style="@style/Angerona.Help"
+                    android:layout_marginTop="6dp"
+                    android:text="Se hai un'app VPN attiva il tuo IP è già nascosto: la verifica reale te lo conferma." />
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal">
+                    <Button
+                        android:id="@+id/btn_check"
+                        style="@style/Angerona.Button"
+                        android:layout_marginEnd="8dp"
+                        android:text="Verifica reale" />
+                    <Button
+                        android:id="@+id/btn_tests"
+                        style="@style/Angerona.Button"
+                        android:text="Altri test" />
+                </LinearLayout>
+            </LinearLayout>
+
             <!-- DNS -->
             <LinearLayout style="@style/Angerona.Section">
                 <TextView style="@style/Angerona.SectionTitle" android:text="DNS sicuro" />
@@ -128,10 +204,6 @@
                         android:importantForAutofill="no"
                         android:inputType="textPassword" />
                 </LinearLayout>
-                <Button
-                    android:id="@+id/btn_check"
-                    style="@style/Angerona.Button"
-                    android:text="Verifica connessione" />
             </LinearLayout>
 
             <!-- Ricerca -->
@@ -185,6 +257,17 @@
                     android:background="@drawable/bg_button_danger"
                     android:text="Cancella tutto adesso"
                     android:textColor="#FFF5C4B3" />
+            </LinearLayout>
+
+            <!-- Aggiornamenti -->
+            <LinearLayout style="@style/Angerona.Section">
+                <TextView style="@style/Angerona.SectionTitle" android:text="Aggiornamenti" />
+                <Switch android:id="@+id/switch_updates" style="@style/Angerona.Switch" android:text="Controlla all'apertura" />
+                <TextView style="@style/Angerona.Help" android:text="Chiede a GitHub se c'è una nuova versione, passando dal DNS cifrato e dal proxy che hai scelto." />
+                <Button
+                    android:id="@+id/btn_update"
+                    style="@style/Angerona.Button"
+                    android:text="Controlla ora" />
             </LinearLayout>
 
             <TextView

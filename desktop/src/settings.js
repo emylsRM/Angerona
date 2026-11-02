@@ -43,6 +43,7 @@ const DEFAULTS = Object.freeze({
   blockTrackers: true,
   blockThirdPartyCookies: true,
   javascript: true,
+  checkUpdates: true,
 });
 
 const clone = (o) => JSON.parse(JSON.stringify(o));
@@ -96,6 +97,7 @@ function sanitize(input, previous = DEFAULTS) {
   s.blockTrackers = bool(i.blockTrackers, s.blockTrackers);
   s.blockThirdPartyCookies = bool(i.blockThirdPartyCookies, s.blockThirdPartyCookies);
   s.javascript = bool(i.javascript, s.javascript);
+  s.checkUpdates = bool(i.checkUpdates, s.checkUpdates);
   return { settings: s, errors };
 }
 

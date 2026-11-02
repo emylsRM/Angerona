@@ -6,6 +6,8 @@ Browser privato e leggero per **Windows** e **Android**, con il nome della dea r
 - **Proxy e VPN**: SOCKS5, HTTP o HTTPS. Se il proxy cade la navigazione si ferma invece di uscire senza protezione. Con una VPN attiva sul sistema non serve configurare nulla.
 - **Ricerca privata**: DuckDuckGo, Startpage, Brave Search, Mojeek, Qwant o la tua istanza SearXNG.
 - **Nessuna traccia**: tutte le schede sono private. Cookie, cache e cronologia restano solo in memoria e spariscono alla chiusura.
+- **Punteggio privacy**: nelle impostazioni un valore da 0 a 100 che cambia mentre modifichi le opzioni, con la spiegazione di cosa vedono i siti, il tuo operatore, il servizio DNS e il proxy. Da lì apri anche i test indipendenti (Mullvad, EFF Cover Your Tracks, BrowserLeaks).
+- **Aggiornamenti**: all'apertura avvisa se su GitHub c'è una versione nuova e la installa con un tocco, verificandone l'integrità.
 - **Protezioni**: blocco di tracker e pubblicità, cookie di terze parti bloccati, solo HTTPS, Global Privacy Control, nessun permesso a fotocamera, microfono, posizione e notifiche.
 
 | | Windows | Android |
@@ -32,17 +34,25 @@ Scorciatoie: `Ctrl+T` nuova scheda · `Ctrl+W` chiudi · `Ctrl+L` barra indirizz
 L'APK si compila gratis su GitHub (servono solo un account e pochi minuti):
 
 1. Crea un repository **privato** su github.com e carica tutto il contenuto di questa cartella (dal computer: «Add file → Upload files», trascinando le cartelle).
-2. Apri la scheda **Actions**, scegli **Compila Angerona** e premi **Run workflow**.
+2. Il caricamento dal browser salta la cartella nascosta `.github`: nella scheda **Actions** clicca **set up a workflow yourself**, incolla il contenuto di `.github/workflows/build.yml` e fai **Commit changes**. La compilazione parte da sola; in seguito puoi rilanciarla con **Run workflow**.
 3. Dopo circa 10 minuti, nella pagina dell'esecuzione trovi l'artefatto **Angerona-Android**: dentro c'è un APK per tipo di processore. Per quasi tutti i telefoni recenti va bene **arm64-v8a**.
 4. Installa l'APK sul telefono (Android ti chiederà di consentire l'installazione da questa fonte).
 
 In alternativa apri la cartella `android` con Android Studio e usa **Build → Build APK(s)**.
 
-Ogni lunedì GitHub ricompila da solo con l'ultimo motore Firefox. Per pubblicare una versione con gli installer allegati crea un tag che inizia con `v` (es. `v1.0.1`).
+Ogni compilazione su `main` (e ogni lunedì, con l'ultimo motore Firefox) pubblica da sola una nuova versione nella sezione **Releases**, numerata `1.0.N`, con APK, installer Windows e impronte SHA-256.
+
+### Aggiornamenti automatici
+
+All'apertura Angerona chiede a GitHub se c'è una versione più recente, passando dal DNS cifrato e dal proxy scelti, e propone l'aggiornamento:
+- **Windows**: scarica l'installer, controlla che l'impronta SHA-256 sia quella pubblicata e lo avvia.
+- **Android**: scarica l'APK adatto al processore del telefono e apre l'installer di sistema (la prima volta Android chiede di consentire l'installazione da Angerona).
+
+Si può disattivare nelle impostazioni, dove c'è anche il pulsante **Controlla ora**. Perché funzioni il repository deve essere pubblico.
 
 ### Firma stabile (consigliata)
 
-Senza una chiave tua ogni compilazione è firmata con una chiave temporanea, e per aggiornare l'app bisogna disinstallarla prima. Per aggiornare senza disinstallare, crea una chiave una volta sola:
+Senza una chiave tua ogni compilazione è firmata con una chiave temporanea: Android rifiuta l'aggiornamento e bisogna disinstallare l'app prima. Con la chiave stabile gli aggiornamenti si installano sopra la versione esistente, mantenendo le impostazioni. Per crearla una volta sola:
 
 ```
 keytool -genkeypair -v -keystore angerona.jks -alias angerona -keyalg RSA -keysize 4096 -validity 10000
@@ -56,6 +66,12 @@ Poi, nel repository GitHub, **Settings → Secrets and variables → Actions**, 
 Conserva `angerona.jks` e le password in un posto sicuro: senza di essi non potrai più aggiornare l'app installata.
 
 ---
+
+## Manutenzione e richieste
+
+Ogni lunedì mattina un agente controlla aggiornamenti di sicurezza dei motori (Electron e GeckoView), liste anti-tracker, bug e compilazioni fallite. Le modifiche arrivano come **pull request**: GitHub le compila e tu le approvi con **Merge pull request**.
+
+Per chiedere una modifica o una nuova funzione apri una **issue** (scheda Issues → New issue) e descrivila con parole semplici: verrà realizzata al giro successivo in una pull request.
 
 ## Proxy e VPN: esempi
 

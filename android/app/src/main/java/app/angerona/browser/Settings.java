@@ -66,6 +66,7 @@ public final class Settings {
     public boolean blockThirdPartyCookies = true;
     public boolean javascript = true;
     public boolean secureScreen = false;
+    public boolean checkUpdates = true;
 
     private static final String PREFS = "angerona";
     private static final String KEY_ALIAS = "angerona-proxy";
@@ -79,6 +80,7 @@ public final class Settings {
         s.httpsOnly = httpsOnly; s.blockTrackers = blockTrackers;
         s.blockThirdPartyCookies = blockThirdPartyCookies; s.javascript = javascript;
         s.secureScreen = secureScreen;
+        s.checkUpdates = checkUpdates;
         return s;
     }
 
@@ -191,6 +193,7 @@ public final class Settings {
         s.blockThirdPartyCookies = p.getBoolean("blockThirdPartyCookies", s.blockThirdPartyCookies);
         s.javascript = p.getBoolean("javascript", s.javascript);
         s.secureScreen = p.getBoolean("secureScreen", s.secureScreen);
+        s.checkUpdates = p.getBoolean("checkUpdates", s.checkUpdates);
         // Valori sconosciuti (versioni future o file alterati) tornano ai predefiniti.
         if (!s.dns.equals(DNS[indexOf(DNS, s.dns)][0])) s.dns = "quad9";
         if (!s.search.equals(SEARCH[indexOf(SEARCH, s.search)][0])) s.search = "duckduckgo";
@@ -219,6 +222,7 @@ public final class Settings {
             .putBoolean("blockThirdPartyCookies", blockThirdPartyCookies)
             .putBoolean("javascript", javascript)
             .putBoolean("secureScreen", secureScreen)
+            .putBoolean("checkUpdates", checkUpdates)
             .commit();
     }
 
