@@ -44,6 +44,13 @@ public final class Settings {
         {"searxng", "SearXNG — la tua istanza", null},
     };
 
+    /** Livelli di protezione dall'impronta del browser (override della protezione di Firefox). */
+    public static final String[][] FINGERPRINT = {
+        {"standard", "Standard di Firefox"},
+        {"rafforzata", "Rafforzata — consigliata"},
+        {"massima", "Massima — come Tor: ora UTC e lingua inglese per i siti"},
+    };
+
     public static final String[][] PROXY = {
         {"none", "Nessuno (diretto o app VPN)"},
         {"socks5", "SOCKS5"},
@@ -67,6 +74,8 @@ public final class Settings {
     public boolean javascript = true;
     public boolean secureScreen = false;
     public boolean checkUpdates = true;
+    public String fingerprint = "rafforzata";
+    public boolean webrtc = false;
 
     private static final String PREFS = "angerona";
     private static final String KEY_ALIAS = "angerona-proxy";
@@ -81,6 +90,8 @@ public final class Settings {
         s.blockThirdPartyCookies = blockThirdPartyCookies; s.javascript = javascript;
         s.secureScreen = secureScreen;
         s.checkUpdates = checkUpdates;
+        s.fingerprint = fingerprint;
+        s.webrtc = webrtc;
         return s;
     }
 
@@ -194,10 +205,13 @@ public final class Settings {
         s.javascript = p.getBoolean("javascript", s.javascript);
         s.secureScreen = p.getBoolean("secureScreen", s.secureScreen);
         s.checkUpdates = p.getBoolean("checkUpdates", s.checkUpdates);
+        s.fingerprint = p.getString("fingerprint", s.fingerprint);
+        s.webrtc = p.getBoolean("webrtc", s.webrtc);
         // Valori sconosciuti (versioni future o file alterati) tornano ai predefiniti.
         if (!s.dns.equals(DNS[indexOf(DNS, s.dns)][0])) s.dns = "quad9";
         if (!s.search.equals(SEARCH[indexOf(SEARCH, s.search)][0])) s.search = "duckduckgo";
         if (!s.proxyMode.equals(PROXY[indexOf(PROXY, s.proxyMode)][0])) s.proxyMode = "none";
+        if (!s.fingerprint.equals(FINGERPRINT[indexOf(FINGERPRINT, s.fingerprint)][0])) s.fingerprint = "rafforzata";
         if (!s.validate().isEmpty()) {
             if (s.validate().containsKey("nextdns") || s.validate().containsKey("doh")) s.dns = "quad9";
             if (s.validate().containsKey("searxng")) s.search = "duckduckgo";
@@ -223,6 +237,8 @@ public final class Settings {
             .putBoolean("javascript", javascript)
             .putBoolean("secureScreen", secureScreen)
             .putBoolean("checkUpdates", checkUpdates)
+            .putString("fingerprint", fingerprint)
+            .putBoolean("webrtc", webrtc)
             .commit();
     }
 

@@ -66,11 +66,28 @@ public final class Engine {
         runtime = GeckoRuntime.create(ctx, b.build());
         runtime.getSettings().setFingerprintingProtection(true);
         runtime.getSettings().setFingerprintingProtectionPrivateBrowsing(true);
+        runtime.getSettings().setFingerprintingProtectionOverrides(fingerprintOverrides(settings));
         installProxyExtension();
     }
 
     public Settings settings() {
         return settings.copy();
+    }
+
+    // Protezioni aggiuntive dall'impronta (nomi dei bersagli in toolkit/components/resistfingerprinting/RFPTargets.inc).
+    // Scelte per non rompere i siti: niente blocco del canvas, niente finestre a dimensione fissa, colori e tema intatti.
+    private static final String FP_RAFFORZATA = "+CanvasRandomization,+EfficientCanvasRandomization,+WebGLRandomization,"
+        + "+WebGLVendorSanitize,+AudioContext,+AudioSampleRate,+FontVisibilityBaseSystem,+FontVisibilityLangPack,"
+        + "+NavigatorHWConcurrencyTiered,+MaxTouchPoints,+MediaDevices,+MediaCapabilities,+NetworkConnection,"
+        + "+DeviceSensors,+ScreenRect,+ScreenAvailRect,+ScreenPixelDepth,+WindowScreenXY,+CSSDeviceSize,"
+        + "+CSSColorInfo,+SpeechSynthesis,+Gamepad,+WebGPULimits,+DiskStorageLimit,+NavigatorOscpu,+NavigatorBuildID";
+    // In più, come Tor Browser: fuso orario UTC, formati e lingua inglesi per le API JavaScript, timer meno precisi.
+    private static final String FP_MASSIMA = FP_RAFFORZATA + ",+JSDateTimeUTC,+JSLocale,+ReduceTimerPrecision,+NavigatorPlatform";
+
+    static String fingerprintOverrides(Settings s) {
+        if ("massima".equals(s.fingerprint)) return FP_MASSIMA;
+        if ("rafforzata".equals(s.fingerprint)) return FP_RAFFORZATA;
+        return "";
     }
 
     private static int cookieBehavior(Settings s) {
@@ -105,6 +122,7 @@ public final class Engine {
         }
         rs.setAllowInsecureConnections(s.httpsOnly ? GeckoRuntimeSettings.HTTPS_ONLY : GeckoRuntimeSettings.ALLOW_ALL);
         rs.setJavaScriptEnabled(s.javascript);
+        rs.setFingerprintingProtectionOverrides(fingerprintOverrides(s));
         int cookies = cookieBehavior(s);
         ContentBlocking.Settings cb = rs.getContentBlocking();
         cb.setAntiTracking(s.blockTrackers ? ContentBlocking.AntiTracking.STRICT : ContentBlocking.AntiTracking.DEFAULT);
@@ -170,7 +188,8 @@ public final class Engine {
                 .put("host", settings.proxyHost)
                 .put("port", settings.proxyEnabled() ? Integer.parseInt(settings.proxyPort) : 0)
                 .put("user", settings.proxyUser)
-                .put("pass", settings.proxyPass);
+                .put("pass", settings.proxyPass)
+                .put("webrtc", settings.webrtc);
             port.postMessage(new JSONObject().put("type", "config").put("config", cfg));
         } catch (JSONException | NumberFormatException e) {
             Log.e(TAG, "Configurazione proxy non valida", e);

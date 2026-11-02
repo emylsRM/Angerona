@@ -1,12 +1,12 @@
 {
   "manifest_version": 2,
   "name": "Angerona proxy",
-  "version": "1.0",
+  "version": "1.1",
   "description": "Instrada il traffico del browser nel proxy scelto. Blocca tutto finché la configurazione non è arrivata.",
   "browser_specific_settings": {
     "gecko": { "id": "proxy@angerona.app" }
   },
-  "permissions": ["proxy", "<all_urls>", "nativeMessaging", "geckoViewAddons"],
+  "permissions": ["proxy", "privacy", "<all_urls>", "nativeMessaging", "geckoViewAddons"],
   "background": { "scripts": ["background.js"] },
   "incognito": "spanning"
 }

@@ -49,6 +49,8 @@ function evaluate(s) {
     s.blockThirdPartyCookies
       ? 'I servizi esterni incorporati (pulsanti social, video) non ricevono i loro cookie.'
       : 'I servizi esterni incorporati possono riconoscerti tra siti diversi finché il browser resta aperto.',
+    'WebRTC non può rivelare il tuo indirizzo IP: le connessioni dirette passano solo da un proxy, se c\'è.',
+    "Possono calcolare un'impronta del browser (grafica, schermo, hardware): su Windows Angerona non la maschera ancora.",
     'Non trovano cronologia precedente: cookie e dati spariscono alla chiusura.',
   ];
 
