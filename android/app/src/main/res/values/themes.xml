@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+        <style name="Angerona" />
     <style name="Theme.Angerona" parent="android:Theme.Material.NoActionBar">
         <item name="android:colorPrimary">@color/bar</item>
         <item name="android:colorPrimaryDark">@color/strip</item>
