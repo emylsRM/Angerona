@@ -54,8 +54,10 @@ async function build(lists, minSize, file, label) {
   const engine = FiltersEngine.parse(texts.join('\n'), ENGINE_CONFIG);
   mkdirSync(new URL('../resources/', import.meta.url), { recursive: true });
   const data = engine.serialize();
+  const rules = engine.getFilters().networkFilters.length;
   writeFileSync(new URL(`../resources/${file}`, import.meta.url), data);
-  console.log(`${label}: ${engine.getFilters().networkFilters.length} regole, ${(data.length / 1024 / 1024).toFixed(1)} MB`);
+  writeFileSync(new URL(`../resources/${file}.json`, import.meta.url), JSON.stringify({ rules }));
+  console.log(`${label}: ${rules} regole, ${(data.length / 1024 / 1024).toFixed(1)} MB`);
 }
 
 let failed = false;

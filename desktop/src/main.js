@@ -10,7 +10,7 @@ const {
 const {
   SettingsStore, sanitize, searchUrl, DNS_PROVIDERS, SEARCH_ENGINES, PROXY_MODES, AUTO_CLEAR_MINUTES,
 } = require('./settings');
-const { Privacy, inputToUrl } = require('./privacy');
+const { Privacy, inputToUrl, buildEngine } = require('./privacy');
 const pages = require('./pages');
 const report = require('./report');
 const { Updater } = require('./updater');
@@ -211,7 +211,10 @@ function selfTest(file) {
     ).catch(() => false);
     const wc = activeWc();
     const start = Boolean(wc) && wc.getURL().startsWith(HOME) && !wc.isLoading();
-    finish(ui && start ? 'ok' : `errore: interfaccia=${ui} pagina=${start}`);
+    // Le liste grandi si preparano in un thread separato: deve funzionare anche dentro app.asar.
+    const built = await buildEngine('||selftest.invalid^').catch(() => null);
+    const thread = Boolean(built && built.worker && built.rules === 1);
+    finish(ui && start && thread ? 'ok' : `errore: interfaccia=${ui} pagina=${start} thread=${thread}`);
   }, 4000));
 }
 

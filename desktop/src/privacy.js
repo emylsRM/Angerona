@@ -3,6 +3,7 @@
 // cookie di terze parti, HTTPS-only, certificati.
 const fs = require('node:fs');
 const path = require('node:path');
+const { Worker } = require('node:worker_threads');
 const { app, session } = require('electron');
 const { getDomain, parse } = require('tldts');
 const { FiltersEngine, Request } = require('@ghostery/adblocker');
@@ -93,13 +94,20 @@ class Privacy {
   // ---------- Liste di blocco ----------
   #cacheFile(kind) { return path.join(this.dataDir, KINDS[kind].file); }
 
+  // Usa la copia più recente tra quella scaricata e quella inclusa nel browser.
   #load(kind) {
     const bundled = path.join(__dirname, '..', 'resources', KINDS[kind].file);
-    for (const [file, source] of [[this.#cacheFile(kind), 'aggiornate'], [bundled, 'incluse nel browser']]) {
+    const candidates = [[this.#cacheFile(kind), 'aggiornate'], [bundled, 'incluse nel browser']]
+      .map(([file, source]) => {
+        try { return { file, source, mtime: fs.statSync(file).mtimeMs }; } catch { return null; }
+      })
+      .filter(Boolean)
+      .sort((a, b) => b.mtime - a.mtime);
+    for (const { file, source, mtime } of candidates) {
       try {
         const engine = FiltersEngine.deserialize(new Uint8Array(fs.readFileSync(file)));
         this.engines[kind] = engine;
-        this.info[kind] = { rules: countRules(engine), updated: fs.statSync(file).mtime.toISOString(), source };
+        this.info[kind] = { rules: readRuleCount(file) ?? countRules(engine), updated: new Date(mtime).toISOString(), source };
         return true;
       } catch { /* prova il successivo */ }
     }
@@ -113,7 +121,8 @@ class Privacy {
   }
 
   needsFilterUpdate(kind = 'trackers') {
-    try { return Date.now() - fs.statSync(this.#cacheFile(kind)).mtimeMs > KINDS[kind].maxAge; } catch { return true; }
+    const updated = Date.parse(this.info[kind].updated || '');
+    return !Number.isFinite(updated) || Date.now() - updated > KINDS[kind].maxAge;
   }
 
   // Scarica le liste passando dalla sessione del browser, quindi da DNS cifrato e proxy.
@@ -132,12 +141,13 @@ class Privacy {
       if (!text) throw new Error('Liste di protezione non raggiungibili');
       texts.push(text);
     }
-    const engine = FiltersEngine.parse(texts.join('\n'), ENGINE_CONFIG);
+    const { data, rules } = await buildEngine(texts.join('\n'));
     const file = this.#cacheFile(kind);
-    fs.writeFileSync(`${file}.tmp`, engine.serialize());
+    fs.writeFileSync(`${file}.tmp`, data);
     fs.renameSync(`${file}.tmp`, file);
-    this.engines[kind] = engine;
-    this.info[kind] = { rules: countRules(engine), updated: new Date().toISOString(), source: 'aggiornate' };
+    try { fs.writeFileSync(`${file}.json`, JSON.stringify({ rules })); } catch { /* solo informativo */ }
+    this.engines[kind] = FiltersEngine.deserialize(data);
+    this.info[kind] = { rules, updated: new Date().toISOString(), source: 'aggiornate' };
     return this.info[kind];
   }
 
@@ -292,6 +302,54 @@ function countRules(engine) {
   try { return engine.getFilters().networkFilters.length; } catch { return 0; }
 }
 
+function readRuleCount(file) {
+  try {
+    const n = JSON.parse(fs.readFileSync(`${file}.json`, 'utf8')).rules;
+    return Number.isInteger(n) && n >= 0 ? n : null;
+  } catch { return null; }
+}
+
+// Le liste dei siti pericolosi hanno oltre 150.000 regole: prepararle richiede qualche secondo,
+// quindi lo si fa in un thread separato per non bloccare il browser. Se il thread non parte,
+// si ripiega sul thread principale.
+const ADBLOCKER_PATH = require.resolve('@ghostery/adblocker');
+const WORKER_CODE = `
+  const { parentPort, workerData } = require('node:worker_threads');
+  const { FiltersEngine } = require(workerData.lib);
+  const engine = FiltersEngine.parse(workerData.text, workerData.config);
+  const data = engine.serialize();
+  parentPort.postMessage({ data, rules: engine.getFilters().networkFilters.length });
+`;
+
+function buildEngineInline(text) {
+  const engine = FiltersEngine.parse(text, ENGINE_CONFIG);
+  return { data: engine.serialize(), rules: countRules(engine), worker: false };
+}
+
+function buildEngine(text) {
+  return new Promise((resolve) => {
+    let worker;
+    try {
+      worker = new Worker(WORKER_CODE, { eval: true, workerData: { lib: ADBLOCKER_PATH, text, config: ENGINE_CONFIG } });
+    } catch {
+      resolve(buildEngineInline(text));
+      return;
+    }
+    let settled = false;
+    const finish = (value) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      worker.terminate().catch(() => {});
+      resolve(value || buildEngineInline(text));
+    };
+    const timer = setTimeout(() => finish(null), 120000);
+    worker.once('message', (m) => finish({ data: new Uint8Array(m.data), rules: m.rules, worker: true }));
+    worker.once('error', () => finish(null));
+    worker.once('exit', () => finish(null));
+  });
+}
+
 // Indirizzo digitato o ricerca? Restituisce un URL navigabile.
 function inputToUrl(input, makeSearchUrl) {
   const t = String(input || '').trim();
@@ -308,4 +366,4 @@ function inputToUrl(input, makeSearchUrl) {
   return makeSearchUrl(t);
 }
 
-module.exports = { Privacy, inputToUrl, isPrivateHost, isPublicWebUrl };
+module.exports = { Privacy, inputToUrl, isPrivateHost, isPublicWebUrl, buildEngine };
