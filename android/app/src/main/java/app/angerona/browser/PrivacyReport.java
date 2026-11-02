@@ -91,9 +91,9 @@ final class PrivacyReport {
             ? "Vedono il tipo di browser e la lingua."
             : "Vedono solo il tipo di browser e la lingua: senza JavaScript non leggono altri dettagli del telefono.");
         if ("massima".equals(s.fingerprint)) {
-            sites.sees.add("Grafica, audio, schermo e caratteri sono mascherati e cambiano a ogni sessione; in più vedono ora UTC e formati inglesi, come chi usa Tor Browser.");
+            sites.sees.add("Grafica, audio, caratteri e scheda video sono mascherati e cambiano a ogni sessione; il browser si presenta come Firefox su Android 10, con ora UTC e lingua inglese, come chi usa Tor Browser.");
         } else if ("rafforzata".equals(s.fingerprint)) {
-            sites.sees.add("Grafica, audio, schermo e caratteri sono mascherati e cambiano a ogni sessione: l'impronta non ti segue da una sessione all'altra.");
+            sites.sees.add("Grafica, audio, caratteri e scheda video sono mascherati e cambiano a ogni sessione; il browser si presenta come Firefox su Android 10.");
         } else {
             sites.sees.add("L'impronta del browser è protetta solo dalle difese standard di Firefox.");
         }
@@ -150,7 +150,7 @@ final class PrivacyReport {
         if (!s.blockTrackers) r.tips.add(new Tip("Attiva la protezione rigorosa dai tracker.", 7));
         if (!s.blockThirdPartyCookies) r.tips.add(new Tip("Blocca del tutto i cookie di terze parti.", 4));
         if ("standard".equals(s.fingerprint)) r.tips.add(new Tip("Scegli la protezione dall'impronta «Rafforzata».", 3));
-        else if ("rafforzata".equals(s.fingerprint)) r.tips.add(new Tip("Con l'impronta «Massima» sembri uguale a molti altri utenti (ora UTC, formati inglesi).", 2));
+        else if ("rafforzata".equals(s.fingerprint)) r.tips.add(new Tip("Con l'impronta «Massima» sembri uguale a molti altri utenti (ora UTC, lingua inglese).", 2));
         if (s.javascript) r.tips.add(new Tip("Disattivare JavaScript riduce ancora le informazioni sul telefono, ma molti siti smettono di funzionare.", 5));
         return r;
     }

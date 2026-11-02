@@ -249,7 +249,7 @@
                     android:layout_marginTop="4dp"
                     android:background="@drawable/bg_input"
                     android:popupBackground="@drawable/bg_popup" />
-                <TextView style="@style/Angerona.Help" android:layout_marginTop="6dp" android:text="Rende diversi a ogni sessione i dati con cui i siti riconoscono il telefono (grafica, audio, schermo, caratteri). «Massima» mostra ai siti ora UTC e formati inglesi, come Tor Browser." />
+                <TextView style="@style/Angerona.Help" android:layout_marginTop="6dp" android:text="Rende diversi a ogni sessione i dati con cui i siti riconoscono il telefono (grafica, audio, caratteri, scheda video) e si presenta come Firefox su Android 10. «Massima» mostra ai siti ora UTC e lingua inglese, come Tor Browser. Vale per le nuove schede." />
                 <Switch android:id="@+id/switch_webrtc" style="@style/Angerona.Switch" android:text="WebRTC" />
                 <TextView style="@style/Angerona.Help" android:text="Serve a chiamate e trasferimenti diretti nel browser. Spento non può rivelare il tuo indirizzo IP; acceso, con un proxy passa solo dal proxy." />
                 <Switch android:id="@+id/switch_js" style="@style/Angerona.Switch" android:text="JavaScript" />

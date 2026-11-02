@@ -10,6 +10,7 @@ import org.json.JSONObject;
 import org.mozilla.geckoview.ContentBlocking;
 import org.mozilla.geckoview.GeckoRuntime;
 import org.mozilla.geckoview.GeckoRuntimeSettings;
+import org.mozilla.geckoview.GeckoSession;
 import org.mozilla.geckoview.WebExtension;
 import org.mozilla.geckoview.WebExtensionController;
 
@@ -67,6 +68,7 @@ public final class Engine {
         runtime.getSettings().setFingerprintingProtection(true);
         runtime.getSettings().setFingerprintingProtectionPrivateBrowsing(true);
         runtime.getSettings().setFingerprintingProtectionOverrides(fingerprintOverrides(settings));
+        runtime.getSettings().setLocales(locales(settings));
         installProxyExtension();
     }
 
@@ -76,13 +78,32 @@ public final class Engine {
 
     // Protezioni aggiuntive dall'impronta (nomi dei bersagli in toolkit/components/resistfingerprinting/RFPTargets.inc).
     // Scelte per non rompere i siti: niente blocco del canvas, niente finestre a dimensione fissa, colori e tema intatti.
+    // Niente ScreenRect/ScreenAvailRect/CSSDeviceSize: su Android danno uno schermo 0x0, raro (quindi identificante)
+    // e capace di rompere le pagine. La scheda video si presenta come "Mozilla", uguale per tutti.
     private static final String FP_RAFFORZATA = "+CanvasRandomization,+EfficientCanvasRandomization,+WebGLRandomization,"
-        + "+WebGLVendorSanitize,+AudioContext,+AudioSampleRate,+FontVisibilityBaseSystem,+FontVisibilityLangPack,"
-        + "+NavigatorHWConcurrencyTiered,+MaxTouchPoints,+MediaDevices,+MediaCapabilities,+NetworkConnection,"
-        + "+DeviceSensors,+ScreenRect,+ScreenAvailRect,+ScreenPixelDepth,+WindowScreenXY,+CSSDeviceSize,"
-        + "+CSSColorInfo,+SpeechSynthesis,+Gamepad,+WebGPULimits,+DiskStorageLimit,+NavigatorOscpu,+NavigatorBuildID";
-    // In più, come Tor Browser: fuso orario UTC, formati e lingua inglesi per le API JavaScript, timer meno precisi.
-    private static final String FP_MASSIMA = FP_RAFFORZATA + ",+JSDateTimeUTC,+JSLocale,+ReduceTimerPrecision,+NavigatorPlatform";
+        + "+WebGLRenderInfo,+WebGLVendorConstant,+WebGLRendererConstant,+AudioContext,+AudioSampleRate,"
+        + "+FontVisibilityBaseSystem,+FontVisibilityLangPack,+NavigatorHWConcurrencyTiered,+MaxTouchPoints,"
+        + "+MediaDevices,+MediaCapabilities,+NetworkConnection,+DeviceSensors,+ScreenPixelDepth,+CSSColorInfo,"
+        + "+SpeechSynthesis,+Gamepad,+WebGPULimits,+DiskStorageLimit,+NavigatorOscpu,+NavigatorBuildID,"
+        + "+NavigatorAppVersion,+NavigatorPlatform";
+    // In più, come Tor Browser: fuso orario UTC, formati inglesi, timer meno precisi, processore generico.
+    private static final String FP_MASSIMA = FP_RAFFORZATA + ",+JSDateTimeUTC,+JSLocale,+ReduceTimerPrecision,+NavigatorHWConcurrency";
+
+    /**
+     * User agent con la versione di Android bloccata a 10, come fa Firefox sui telefoni più vecchi:
+     * "Android 16" con l'ultimo Firefox è raro e quindi riconoscibile. Null = quello predefinito.
+     */
+    static String userAgent(Settings s) {
+        if ("standard".equals(s.fingerprint)) return null;
+        String ua = GeckoSession.getDefaultUserAgent();
+        return ua.replaceFirst("\\(Android [0-9.]+; Mobile;", "(Android 10; Mobile;");
+    }
+
+    /** Lingue chieste ai siti: con «Massima» solo inglese, come Tor Browser; altrimenti quelle del telefono. */
+    static String[] locales(Settings s) {
+        if ("massima".equals(s.fingerprint)) return new String[] {"en-US", "en"};
+        return android.os.LocaleList.getDefault().toLanguageTags().split(",");
+    }
 
     static String fingerprintOverrides(Settings s) {
         if ("massima".equals(s.fingerprint)) return FP_MASSIMA;
@@ -123,6 +144,7 @@ public final class Engine {
         rs.setAllowInsecureConnections(s.httpsOnly ? GeckoRuntimeSettings.HTTPS_ONLY : GeckoRuntimeSettings.ALLOW_ALL);
         rs.setJavaScriptEnabled(s.javascript);
         rs.setFingerprintingProtectionOverrides(fingerprintOverrides(s));
+        rs.setLocales(locales(s));
         int cookies = cookieBehavior(s);
         ContentBlocking.Settings cb = rs.getContentBlocking();
         cb.setAntiTracking(s.blockTrackers ? ContentBlocking.AntiTracking.STRICT : ContentBlocking.AntiTracking.DEFAULT);
