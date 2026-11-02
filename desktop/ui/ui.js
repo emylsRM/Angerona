@@ -20,6 +20,7 @@
     down: '<path d="m6 9 6 6 6-6"/>',
     globe: '<circle cx="12" cy="12" r="9"/><path d="M3.6 9h16.8M3.6 15h16.8M11.5 3a17 17 0 0 0 0 18M12.5 3a17 17 0 0 1 0 18"/>',
     search: '<circle cx="10" cy="10" r="7"/><path d="m21 21-6-6"/>',
+    flame: '<path d="M12 10.941c2.333-3.308.167-7.823-1-8.941 0 3.395-2.235 5.299-3.667 6.706-1.43 1.408-2.333 3.621-2.333 5.588 0 3.704 3.134 6.706 7 6.706s7-3.002 7-6.706c0-1.712-1.232-4.403-2.333-5.588-2.084 3.353-3.257 3.353-4.667 2.235"/>',
   };
   const svg = (name, size = 18) => `<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICON[name]}</svg>`;
 
@@ -143,6 +144,17 @@
     renderTabs();
     renderToolbar();
   });
+
+  // ---------- Pulsante "brucia tutto" ----------
+  function renderBurn(n) {
+    const b = $('#burn');
+    const shown = n > 9999 ? '9999+' : n.toLocaleString('it-IT');
+    b.innerHTML = svg('flame', 16) + (n > 0 ? `<span>${shown}</span>` : '');
+    b.title = `${n === 1 ? '1 tracker bloccato' : `${shown} tracker bloccati`} in questa sessione. Clicca per cancellare tutto (Ctrl+Maiusc+Canc)`;
+  }
+  renderBurn(0);
+  api.on('session', (s) => renderBurn(Number(s && s.blocked) || 0));
+  $('#burn').addEventListener('click', () => { closePanel(); api.invoke('data:burn'); });
 
   $('#new-tab').addEventListener('click', () => { closePanel(); api.invoke('tab:new'); focusAddress(); });
   $('#back').addEventListener('click', () => api.invoke('tab:back'));

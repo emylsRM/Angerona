@@ -98,6 +98,12 @@ svg { display: block; }
 }
 .shield.active { background: rgba(127, 119, 221, 0.18); color: var(--text); }
 .shield.off { color: #5d56a8; }
+.burn {
+  height: 28px; min-width: 28px; padding: 0 8px; flex: none; display: flex; align-items: center; gap: 5px;
+  border: 0; border-radius: 14px; background: transparent; color: var(--warn); font-size: 12px; cursor: pointer;
+}
+.burn:hover { background: rgba(240, 153, 123, 0.16); color: #F5C4B3; }
+.burn span { color: var(--text); }
 
 #notice {
   max-width: 280px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis;

@@ -146,6 +146,22 @@
             android:textColor="@color/text"
             android:textSize="12sp" />
 
+        <TextView
+            android:id="@+id/burn"
+            android:layout_width="wrap_content"
+            android:layout_height="44dp"
+            android:background="@drawable/bg_ripple_round"
+            android:contentDescription="Cancella tutto"
+            android:drawableStart="@drawable/ic_fire"
+            android:drawablePadding="3dp"
+            android:drawableTint="@color/warn"
+            android:gravity="center_vertical"
+            android:minWidth="36dp"
+            android:paddingStart="6dp"
+            android:paddingEnd="6dp"
+            android:textColor="@color/text"
+            android:textSize="12sp" />
+
         <FrameLayout
             android:id="@+id/tabs_button"
             android:layout_width="44dp"

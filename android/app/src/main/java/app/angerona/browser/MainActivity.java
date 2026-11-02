@@ -59,6 +59,9 @@ public class MainActivity extends Activity {
     private EditText address;
     private ImageView siteState;
     private TextView shield;
+    private TextView burn;
+    /** Tracker bloccati da quando l'app è aperta (o dall'ultima cancellazione). */
+    private int sessionBlocked;
     private TextView tabCount;
     private ProgressBar progress;
     private View toolbar;
@@ -82,6 +85,7 @@ public class MainActivity extends Activity {
         address = findViewById(R.id.address);
         siteState = findViewById(R.id.site_state);
         shield = findViewById(R.id.shield);
+        burn = findViewById(R.id.burn);
         tabCount = findViewById(R.id.tab_count);
         progress = findViewById(R.id.progress);
         toolbar = findViewById(R.id.toolbar);
@@ -195,6 +199,7 @@ public class MainActivity extends Activity {
             Toast.makeText(this, msg, Toast.LENGTH_SHORT).show();
         });
         findViewById(R.id.tabs_button).setOnClickListener(v -> showTabs());
+        burn.setOnClickListener(v -> showBurn());
         findViewById(R.id.menu).setOnClickListener(this::showMenu);
     }
 
@@ -223,6 +228,7 @@ public class MainActivity extends Activity {
 
     private void render() {
         tabCount.setText(tabs.size() > 99 ? ":D" : String.valueOf(tabs.size()));
+        burn.setText(sessionBlocked == 0 ? "" : sessionBlocked > 9999 ? "9999+" : String.valueOf(sessionBlocked));
         if (current == null) return;
         if (!address.hasFocus()) address.setText(current.displayUrl());
 
@@ -451,6 +457,7 @@ public class MainActivity extends Activity {
             @Override
             public void onContentBlocked(GeckoSession s, ContentBlocking.BlockEvent event) {
                 tab.blocked++;
+                sessionBlocked++;
                 if (tab == current) render();
             }
         });
@@ -647,8 +654,23 @@ public class MainActivity extends Activity {
         return false;
     }
 
+    /** Pulsante "brucia tutto": riepilogo dei tracker bloccati, poi cancella e chiude oppure continua. */
+    private void showBurn() {
+        if (!ready) return;
+        String count = sessionBlocked == 1 ? "1 tracker" : String.format(Locale.ITALIAN, "%,d tracker", sessionBlocked);
+        new AlertDialog.Builder(this)
+            .setTitle("Cancella tutto")
+            .setMessage("In questa sessione Angerona ha bloccato " + count + ".\n\n"
+                + "Si chiudono tutte le schede e si cancellano cookie, cache, accessi e dati dei siti.")
+            .setPositiveButton("Cancella e chiudi", (d, w) -> clearAll(true))
+            .setNeutralButton("Cancella e continua", (d, w) -> clearAll(false))
+            .setNegativeButton("Annulla", null)
+            .show();
+    }
+
     /** Chiude tutte le schede e cancella cookie, cache e dati dei siti. */
     private void clearAll(boolean exit) {
+        sessionBlocked = 0;
         if (geckoView.getSession() != null) geckoView.releaseSession();
         for (Tab t : tabs) t.session.close();
         tabs.clear();
