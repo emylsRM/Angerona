@@ -1,20 +1,26 @@
 'use strict';
 // Angerona — processo principale: finestra, schede, scorciatoie, comunicazione con l'interfaccia.
+const crypto = require('node:crypto');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 const {
-  app, BrowserWindow, WebContentsView, ipcMain, Menu, clipboard, session, protocol,
+  app, BrowserWindow, WebContentsView, ipcMain, Menu, clipboard, session, protocol, powerMonitor,
 } = require('electron');
 const {
-  SettingsStore, sanitize, searchUrl, DNS_PROVIDERS, SEARCH_ENGINES, PROXY_MODES,
+  SettingsStore, sanitize, searchUrl, DNS_PROVIDERS, SEARCH_ENGINES, PROXY_MODES, AUTO_CLEAR_MINUTES,
 } = require('./settings');
-const { Privacy, inputToUrl } = require('./privacy');
+const { Privacy, inputToUrl, buildEngine } = require('./privacy');
 const pages = require('./pages');
 const report = require('./report');
 const { Updater } = require('./updater');
 
 const PARTITION = 'angerona-private'; // senza "persist:" la sessione vive solo in memoria
+const UI_PARTITION = 'angerona-ui';
+const UI_SCHEME = 'angerona-ui';
+const UI_DIR = path.join(__dirname, '..', 'ui');
+const UI_URL = `${UI_SCHEME}://app/index.html`;
+const FP_PRELOAD = path.join(__dirname, 'fp-preload.js');
 const HOME = 'angerona://start';
 const THEME = { strip: '#1C1846', bar: '#26215C', page: '#16132F', text: '#CECBF6' };
 const TABSTRIP_HEIGHT = 40;
@@ -27,6 +33,13 @@ const PRIVACY_TESTS = {
 
 app.setName('Angerona');
 const settingsDir = app.getPath('userData');
+// Solo per le prove automatiche: minuti più corti per la cancellazione automatica.
+const MINUTE_MS = Number(process.env.ANGERONA_TEST_MINUTE_MS) > 0 ? Number(process.env.ANGERONA_TEST_MINUTE_MS) : 60000;
+
+/** Legge un'impostazione prima dell'avvio di Electron (serve per le opzioni del motore). */
+function earlySetting(key) {
+  try { return JSON.parse(fs.readFileSync(path.join(settingsDir, 'settings.json'), 'utf8'))[key]; } catch { return undefined; }
+}
 
 // ---------- Avvio: una sola istanza, dati temporanei cancellati alla chiusura ----------
 if (!app.requestSingleInstanceLock()) {
@@ -53,7 +66,13 @@ function start() {
 
   app.commandLine.appendSwitch('force-webrtc-ip-handling-policy', 'disable_non_proxied_udp');
   app.commandLine.appendSwitch('disable-features', 'SpareRendererForSitePerProcess,MediaRouter');
-  protocol.registerSchemesAsPrivileged([{ scheme: 'angerona', privileges: { standard: true, secure: true } }]);
+  // Modalità blindata: JavaScript senza compilatore JIT (e quindi senza WebAssembly), come la
+  // «protezione avanzata» di Edge. La maggior parte degli attacchi ai browser passa dal JIT.
+  if (earlySetting('hardened') === true) app.commandLine.appendSwitch('js-flags', '--jitless');
+  protocol.registerSchemesAsPrivileged([
+    { scheme: 'angerona', privileges: { standard: true, secure: true } },
+    { scheme: UI_SCHEME, privileges: { standard: true, secure: true } },
+  ]);
   Menu.setApplicationMenu(null);
 
   app.whenReady().then(init).catch((err) => {
@@ -87,6 +106,9 @@ let panelOpen = false;
 let htmlFullscreen = false;
 let updater = null;
 let sessionBlocked = 0; // tracker bloccati da quando il browser è aperto (o dall'ultima cancellazione)
+let fpSeed = crypto.randomBytes(16).toString('hex'); // cambia a ogni cancellazione: nuova impronta
+let dirty = false; // qualche sito è stato aperto dall'ultima cancellazione
+let focusLostAt = null;
 
 function userAgent() {
   const major = process.versions.chrome.split('.')[0];
@@ -95,8 +117,40 @@ function userAgent() {
   return `Mozilla/5.0 (${platform}) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/${major}.0.0.0 Safari/537.36`;
 }
 
+// L'interfaccia è servita da un protocollo interno e non può andare in rete.
+const UI_MIME = {
+  '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8',
+  '.css': 'text/css; charset=utf-8', '.png': 'image/png', '.svg': 'image/svg+xml',
+};
+async function serveUi(req) {
+  let file;
+  try { file = path.normalize(path.join(UI_DIR, decodeURIComponent(new URL(req.url).pathname))); } catch { file = ''; }
+  const type = UI_MIME[path.extname(file)];
+  if (!type || !file.startsWith(UI_DIR + path.sep) || path.basename(file) === 'preload.js') {
+    return new Response('Non trovato', { status: 404 });
+  }
+  try {
+    const body = await fs.promises.readFile(file);
+    return new Response(body, { headers: { 'content-type': type, 'x-content-type-options': 'nosniff', 'cache-control': 'no-store' } });
+  } catch {
+    return new Response('Non trovato', { status: 404 });
+  }
+}
+
+function hardenUiSession() {
+  const uiSes = session.fromPartition(UI_PARTITION);
+  uiSes.setSpellCheckerEnabled(false);
+  uiSes.setPermissionRequestHandler((_wc, _perm, cb) => cb(false));
+  uiSes.setPermissionCheckHandler(() => false);
+  uiSes.webRequest.onBeforeRequest((d, cb) => cb({ cancel: !/^(angerona-ui|data|devtools):/.test(d.url) }));
+  uiSes.protocol.handle(UI_SCHEME, serveUi);
+  // Il correttore ortografico scaricherebbe dizionari da Google: spento ovunque.
+  session.defaultSession.setSpellCheckerEnabled(false);
+}
+
 async function init() {
   store = new SettingsStore(settingsDir);
+  hardenUiSession();
   ses = session.fromPartition(PARTITION);
   privacy = new Privacy({
     ses, settings: store.value, dataDir: settingsDir, onBlocked: countBlocked,
@@ -118,15 +172,50 @@ async function init() {
 
   createWindow();
   createTab(HOME);
+  if (process.env.ANGERONA_SELFTEST) selfTest(process.env.ANGERONA_SELFTEST);
 
   // Controllo aggiornamenti all'avvio, attraverso DNS cifrato e proxy come ogni altra richiesta.
   if (store.value.checkUpdates) setTimeout(() => updater.check().catch(() => {}), 6000);
 
-  if (store.value.blockTrackers && privacy.needsFilterUpdate()) {
+  if (store.value.blockTrackers && privacy.needsFilterUpdate('trackers')) {
     setTimeout(() => {
-      privacy.updateFilters().then(() => sendSettings()).catch(() => { /* riprova al prossimo avvio */ });
+      privacy.updateFilters('trackers').then(() => sendSettings()).catch(() => { /* riprova al prossimo avvio */ });
     }, 4000);
   }
+  // Le liste dei siti pericolosi cambiano più volte al giorno: controllo all'avvio e ogni ora.
+  const refreshThreats = () => {
+    if (!store.value.blockThreats || !privacy.needsFilterUpdate('threats')) return;
+    privacy.updateFilters('threats').then(() => sendSettings()).catch(() => { /* riprova più tardi */ });
+  };
+  setTimeout(refreshThreats, 5000);
+  setInterval(refreshThreats, 3600 * 1000);
+  setInterval(checkAutoClear, Math.min(20000, MINUTE_MS / 3));
+  powerMonitor.on('lock-screen', () => { if (focusLostAt === null) focusLostAt = Date.now(); });
+  powerMonitor.on('unlock-screen', () => { if (win && win.isFocused()) focusLostAt = null; });
+}
+
+// Prova d'avvio usata dalla compilazione su GitHub: interfaccia e pagina iniziale devono caricarsi.
+function selfTest(file) {
+  let done = false;
+  const finish = (result) => {
+    if (done) return;
+    done = true;
+    try { fs.writeFileSync(file, result); } catch { /* ignorato */ }
+    app.exit(result === 'ok' ? 0 : 1);
+  };
+  setTimeout(() => finish('errore: tempo scaduto'), 60000);
+  win.webContents.once('did-fail-load', (_e, code, desc) => finish(`errore: interfaccia ${code} ${desc}`));
+  win.webContents.once('did-finish-load', () => setTimeout(async () => {
+    const ui = await win.webContents.executeJavaScript(
+      "Boolean(document.querySelector('#address') && document.querySelector('.tab'))",
+    ).catch(() => false);
+    const wc = activeWc();
+    const start = Boolean(wc) && wc.getURL().startsWith(HOME) && !wc.isLoading();
+    // Le liste grandi si preparano in un thread separato: deve funzionare anche dentro app.asar.
+    const built = await buildEngine('||selftest.invalid^').catch(() => null);
+    const thread = Boolean(built && built.worker && built.rules === 1);
+    finish(ui && start && thread ? 'ok' : `errore: interfaccia=${ui} pagina=${start} thread=${thread}`);
+  }, 4000));
 }
 
 // ---------- Finestra ----------
@@ -155,8 +244,12 @@ function createWindow() {
   ui.on('will-navigate', (e) => e.preventDefault());
   ui.setWindowOpenHandler(() => ({ action: 'deny' }));
   ui.on('before-input-event', (e, input) => { if (handleShortcut(input)) e.preventDefault(); });
-  win.loadFile(path.join(__dirname, '..', 'ui', 'index.html'));
+  // Appena l'interfaccia è pronta riceve le schede: gli aggiornamenti inviati prima andrebbero persi.
+  ui.on('did-finish-load', () => sendTabs());
+  win.loadURL(UI_URL);
   win.once('ready-to-show', () => win.show());
+  win.on('blur', () => { focusLostAt = Date.now(); });
+  win.on('focus', () => { focusLostAt = null; });
   win.on('resize', layout);
   win.on('enter-full-screen', layout);
   win.on('leave-full-screen', layout);
@@ -174,12 +267,15 @@ function layout() {
 
 // ---------- Schede ----------
 function viewPreferences() {
+  const fp = store.value.reduceFingerprint;
   return {
     partition: PARTITION,
     sandbox: true,
     contextIsolation: true,
     nodeIntegration: false,
-    nodeIntegrationInSubFrames: false,
+    // Con la riduzione dell'impronta lo script di protezione gira anche nei riquadri (sempre senza Node).
+    nodeIntegrationInSubFrames: fp,
+    ...(fp ? { preload: FP_PRELOAD, additionalArguments: [`--angerona-fp=${fpSeed}`] } : {}),
     webSecurity: true,
     allowRunningInsecureContent: false,
     javascript: store.value.javascript,
@@ -196,6 +292,7 @@ function createTab(url, { activate = true, after = null } = {}) {
   view.setBackgroundColor(THEME.page);
   const wc = view.webContents;
   wc.setWebRTCIPHandlingPolicy('disable_non_proxied_udp');
+  wc.on('select-bluetooth-device', (e, _devices, cb) => { e.preventDefault(); cb(''); });
   const tab = {
     id: wc.id, view, title: 'Nuova scheda', url: '', favicon: null, loading: true, blocked: 0,
   };
@@ -236,15 +333,26 @@ function wireTab(tab) {
   });
   wc.on('did-navigate', (_e, url) => {
     tab.url = url;
+    if (/^https?:/.test(url)) dirty = true;
     if (/^https:/.test(url)) privacy.upgraded.delete(wc.id);
     update();
   });
   wc.on('did-navigate-in-page', (_e, url, isMainFrame) => { if (isMainFrame) { tab.url = url; update(); } });
   wc.on('did-fail-load', (_e, code, _desc, url, isMainFrame) => {
     if (!isMainFrame || code === -3) return; // -3: navigazione annullata
+    const danger = privacy.dangerous.get(wc.id);
+    privacy.dangerous.delete(wc.id);
+    if (danger) {
+      tab.url = danger;
+      wc.loadURL(`angerona://blocked?${new URLSearchParams({ url: danger })}`).catch(() => {});
+      return;
+    }
     const http = privacy.upgraded.get(wc.id);
     const wasUpgraded = Boolean(http) && http.replace(/^http:/, 'https:').split('#')[0] === url.split('#')[0];
+    let host = '';
+    try { host = new URL(url).hostname; } catch { /* indirizzo non valido */ }
     const q = new URLSearchParams({ code: String(code), url, http: wasUpgraded ? '1' : '0' });
+    if (code === -202 && privacy.untrustedRoots.has(host)) q.set('reason', 'root');
     tab.url = url;
     wc.loadURL(`angerona://error?${q}`).catch(() => {});
   });
@@ -273,6 +381,12 @@ function onWillNavigate(e, tab) {
       if (/^http:\/\//.test(httpUrl)) {
         privacy.httpAllowed.add(new URL(httpUrl).hostname);
         wc.loadURL(httpUrl).catch(() => {});
+      }
+    } else if (target.hostname === 'allow-threat') {
+      const url = target.searchParams.get('url') || '';
+      if (/^https?:\/\//.test(url)) {
+        privacy.threatAllowed.add(new URL(url).hostname);
+        wc.loadURL(url).catch(() => {});
       }
     } else {
       wc.loadURL(e.url).catch(() => {});
@@ -341,7 +455,7 @@ function countBlocked(wcId) {
 // Indirizzo da mostrare nella barra: per le pagine di errore, quello del sito che ha fallito.
 function displayUrl(url) {
   if (url.startsWith(HOME)) return '';
-  if (/^angerona:\/\/(error|crash)/.test(url)) {
+  if (/^angerona:\/\/(error|crash|blocked)/.test(url)) {
     try { return new URL(url).searchParams.get('url') || ''; } catch { return ''; }
   }
   return url;
@@ -451,6 +565,15 @@ function handleShortcut(input) {
 }
 
 // ---------- Download ----------
+// File che possono eseguire programmi o macro: si avvisa prima di aprirli.
+const RISKY_FILE = /\.(exe|msi|msix|msixbundle|appx|appxbundle|bat|cmd|com|scr|pif|cpl|msc|ps1|psm1|vbs|vbe|js|jse|wsf|wsh|hta|lnk|url|reg|jar|dll|chm|iso|img|vhd|vhdx|application|appref-ms|library-ms|settingcontent-ms|docm|xlsm|pptm)$/i;
+
+/** Segna il file come "scaricato da Internet": Windows SmartScreen e Office lo controllano prima di aprirlo. */
+function markFromInternet(file) {
+  if (process.platform !== 'win32') return;
+  try { fs.writeFileSync(`${file}:Zone.Identifier`, '[ZoneTransfer]\r\nZoneId=3\r\n'); } catch { /* disco non NTFS */ }
+}
+
 function onDownload(_e, item) {
   if (updater && updater.handleDownload(item)) return;
   const name = item.getFilename();
@@ -460,8 +583,16 @@ function onDownload(_e, item) {
   });
   sendUi('toast', `Download di ${name}…`);
   item.once('done', (_ev, state) => {
-    if (state === 'completed') sendUi('toast', `Scaricato: ${path.basename(item.getSavePath())}`);
-    else if (state === 'interrupted') sendUi('toast', `Download non riuscito: ${name}`);
+    if (state === 'completed') {
+      const file = item.getSavePath();
+      markFromInternet(file);
+      const base = path.basename(file);
+      sendUi('toast', RISKY_FILE.test(base)
+        ? `Scaricato ${base}: può avviare programmi, aprilo solo se ti fidi del sito`
+        : `Scaricato: ${base}`);
+    } else if (state === 'interrupted') {
+      sendUi('toast', `Download non riuscito: ${name}`);
+    }
   });
 }
 
@@ -491,7 +622,7 @@ function sendTabs() {
       const h = t.view.webContents.navigationHistory;
       const url = t.view.webContents.getURL() || t.url;
       const shown = displayUrl(url);
-      const errorPage = /^angerona:\/\/(error|crash)/.test(url);
+      const errorPage = /^angerona:\/\/(error|crash|blocked)/.test(url);
       return {
         id,
         title: t.title,
@@ -521,6 +652,8 @@ function settingsPayload() {
     proxyModes: PROXY_MODES,
     filters: privacy.filtersInfo,
     report: report.evaluate(store.value),
+    threats: privacy.threatsInfo,
+    autoClearOptions: AUTO_CLEAR_MINUTES,
     version: app.getVersion(),
     engine: `Chromium ${process.versions.chrome}`,
   };
@@ -569,12 +702,14 @@ ipcMain.handle('settings:set', guard(async (input) => {
   store.save(settings);
   privacy.updateSettings(settings);
   await privacy.applyNetwork(settings);
-  if (settings.blockTrackers && !privacy.engine) privacy.updateFilters().then(sendSettings).catch(() => {});
-  const jsChanged = prev.javascript !== settings.javascript;
+  if (settings.blockTrackers && !privacy.engine) privacy.updateFilters('trackers').then(sendSettings).catch(() => {});
+  if (settings.blockThreats && !privacy.engines.threats) privacy.updateFilters('threats').then(sendSettings).catch(() => {});
+  const jsChanged = prev.javascript !== settings.javascript || prev.reduceFingerprint !== settings.reduceFingerprint;
+  const restart = prev.hardened !== settings.hardened;
   for (const t of tabs.values()) {
     if (t.view.webContents.getURL().startsWith(HOME)) t.view.webContents.reload();
   }
-  return { ok: true, payload: settingsPayload(), jsChanged };
+  return { ok: true, payload: settingsPayload(), jsChanged, restart };
 }));
 ipcMain.handle('privacy:evaluate', guard((input) => report.evaluate(sanitize(input, store.value).settings)));
 ipcMain.handle('tab:open-test', guard((id) => {
@@ -607,31 +742,49 @@ ipcMain.handle('net:check', guard(async () => {
   }
 }));
 ipcMain.handle('filters:update', guard(async () => {
-  try { return { ok: true, filters: await privacy.updateFilters() }; } catch (err) { return { ok: false, error: err.message }; }
+  try {
+    const filters = await privacy.updateFilters('trackers');
+    const threats = await privacy.updateFilters('threats').catch(() => privacy.threatsInfo);
+    return { ok: true, filters, threats };
+  } catch (err) {
+    return { ok: false, error: err.message };
+  }
 }));
 /** Chiude tutte le schede e cancella cookie, cache, accessi, DNS e dati dei siti. */
 async function clearEverything() {
+  fpSeed = crypto.randomBytes(16).toString('hex'); // la nuova scheda avrà già un'impronta nuova
   for (const id of [...order]) closeTab(id);
   await ses.clearStorageData();
   await ses.clearCache();
   await ses.clearAuthCache();
   await ses.clearHostResolverCache();
-  privacy.httpAllowed.clear();
+  privacy.forgetSessionChoices();
   sessionBlocked = 0;
+  dirty = false;
   sendTabs();
 }
 
 let burning = false;
 /** Pulsante "brucia tutto": senza domande chiude tutte le schede, cancella tutto e riparte da zero. */
-async function burn() {
+async function burn(message) {
   if (!win || burning) return;
   burning = true;
   try {
     const n = sessionBlocked;
     await clearEverything();
-    sendUi('toast', `Tracce cancellate · ${n === 1 ? '1 tracker bloccato' : `${n.toLocaleString('it-IT')} tracker bloccati`} in sessione`);
+    sendUi('toast', message || `Tracce cancellate · ${n === 1 ? '1 tracker bloccato' : `${n.toLocaleString('it-IT')} tracker bloccati`} in sessione`);
   } finally {
     burning = false;
+  }
+}
+
+// Cancellazione automatica: dopo N minuti in cui Angerona non è in primo piano (finestra in
+// secondo piano, ridotta a icona o computer bloccato). Leggere a lungo una pagina non la fa scattare.
+function checkAutoClear() {
+  const minutes = store && store.value.autoClear;
+  if (!minutes || !dirty || burning || !win || focusLostAt === null) return;
+  if (Date.now() - focusLostAt >= minutes * MINUTE_MS) {
+    burn(`Tracce cancellate automaticamente dopo ${minutes} minuti senza usare Angerona`);
   }
 }
 

@@ -29,6 +29,8 @@ button:hover, .btn:hover { background: #7F77DD; }
 .chip { background: #26215C; border: 1px solid #3C3489; border-radius: 999px; padding: 4px 12px; font-size: 12.5px; color: #CECBF6; }
 .chip b { font-weight: 500; color: #EEEDFE; }
 .warn { border-color: #993C1D; }
+.danger-icon { width: 72px; height: 72px; border-radius: 20px; margin: 0 auto; display: flex; align-items: center; justify-content: center;
+  background: #4A1B0C; border: 1px solid #993C1D; color: #F5C4B3; font-size: 40px; font-weight: 600; }
 .score { border-color: #7F77DD; }
 .actions { display: flex; gap: 10px; justify-content: center; margin-top: 24px; flex-wrap: wrap; }
 .actions .btn { padding: 10px 18px; border-radius: 10px; display: inline-block; }
@@ -99,6 +101,9 @@ function errorPage(params) {
   const upgraded = params.get('http') === '1';
   let [title, text] = ERRORS[code] || [];
   const n = Number(code);
+  if (params.get('reason') === 'root') {
+    [title, text] = ['Connessione intercettata', "Il certificato di questo sito è stato emesso da un'autorità aggiunta al computer: un antivirus che controlla l'HTTPS, una rete aziendale o un programma dannoso. Con «Rifiuta i certificati aggiunti al computer» attivo, Angerona non si fida. Se conosci la causa, puoi disattivare l'opzione nelle impostazioni."];
+  }
   if (!title && n <= -200 && n > -300) [title, text] = ['Connessione non sicura', 'Il certificato del sito non è valido. Angerona ha fermato la connessione per proteggerti.'];
   if (!title) [title, text] = ['Pagina non disponibile', `Il caricamento non è riuscito (errore ${esc(code)}).`];
   if (upgraded && n > -200) text = 'Il sito non risponde in HTTPS. Puoi aprirlo in HTTP solo se ti fidi: i dati viaggeranno in chiaro.';
@@ -112,6 +117,22 @@ function errorPage(params) {
     <div class="actions">
       ${safeUrl ? `<a class="btn" href="${esc(safeUrl)}">Riprova</a>` : ''}
       ${upgraded && safeUrl ? `<a class="btn ghost" href="angerona://allow-http?url=${encodeURIComponent(httpUrl)}">Apri in HTTP (non protetto)</a>` : ''}
+    </div>`);
+}
+
+// Sito segnalato per truffe o malware: si può tornare indietro o, a proprio rischio, aprirlo lo stesso.
+function blockedPage(params) {
+  const url = params.get('url') || '';
+  const safeUrl = /^https?:\/\//.test(url) ? url : '';
+  return page('Sito pericoloso bloccato', `
+    <div class="danger-icon" aria-hidden="true">!</div>
+    <h1>Sito pericoloso bloccato</h1>
+    <p>Questo indirizzo è segnalato per truffe (finti siti di banche, poste, corrieri…) o per distribuire programmi dannosi. Angerona l'ha fermato prima che si collegasse.</p>
+    <p class="sub">Se qualcuno ti ha mandato questo link per messaggio o email, non inserire dati né password.</p>
+    ${safeUrl ? `<div class="url">${esc(safeUrl)}</div>` : ''}
+    <div class="actions">
+      <a class="btn" href="angerona://start">Torna alla pagina iniziale</a>
+      ${safeUrl ? `<a class="btn ghost" href="angerona://allow-threat?url=${encodeURIComponent(safeUrl)}">Apri comunque (sconsigliato)</a>` : ''}
     </div>`);
 }
 
@@ -130,7 +151,8 @@ function render(url, s, privacy) {
   const body = u.hostname === 'start' ? startPage(s, privacy)
     : u.hostname === 'error' ? errorPage(u.searchParams)
       : u.hostname === 'crash' ? crashPage(u.searchParams)
-        : null;
+        : u.hostname === 'blocked' ? blockedPage(u.searchParams)
+          : null;
   if (!body) return new Response('Non trovato', { status: 404 });
   return new Response(body, {
     headers: {
