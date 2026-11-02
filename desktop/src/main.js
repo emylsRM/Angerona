@@ -4,7 +4,7 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 const {
-  app, BrowserWindow, WebContentsView, ipcMain, Menu, clipboard, session, protocol,
+  app, BrowserWindow, WebContentsView, ipcMain, Menu, clipboard, session, protocol, dialog,
 } = require('electron');
 const {
   SettingsStore, sanitize, searchUrl, DNS_PROVIDERS, SEARCH_ENGINES, PROXY_MODES,
@@ -86,6 +86,7 @@ let chromeHeight = 84;
 let panelOpen = false;
 let htmlFullscreen = false;
 let updater = null;
+let sessionBlocked = 0; // tracker bloccati da quando il browser è aperto (o dall'ultima cancellazione)
 
 function userAgent() {
   const major = process.versions.chrome.split('.')[0];
@@ -333,6 +334,7 @@ function countBlocked(wcId) {
   const tab = tabs.get(wcId);
   if (!tab) return;
   tab.blocked += 1;
+  sessionBlocked += 1;
   sendTabs();
 }
 
@@ -444,6 +446,7 @@ function handleShortcut(input) {
   if (ctrl && key === '0') { wc.setZoomLevel(0); return true; }
   if (key === 'F11') { win.setFullScreen(!win.isFullScreen()); return true; }
   if (ctrl && key === ',') { sendUi('open-panel'); return true; }
+  if (ctrl && input.shift && key === 'Delete') { burn(); return true; }
   return false;
 }
 
@@ -506,6 +509,7 @@ function sendTabs() {
       };
     });
     win.webContents.send('ui:tabs', list);
+    win.webContents.send('ui:session', { blocked: sessionBlocked });
   }, 30);
 }
 
@@ -605,12 +609,47 @@ ipcMain.handle('net:check', guard(async () => {
 ipcMain.handle('filters:update', guard(async () => {
   try { return { ok: true, filters: await privacy.updateFilters() }; } catch (err) { return { ok: false, error: err.message }; }
 }));
-ipcMain.handle('data:clear', guard(async () => {
+/** Chiude tutte le schede e cancella cookie, cache, accessi, DNS e dati dei siti. */
+async function clearEverything() {
+  for (const id of [...order]) closeTab(id);
   await ses.clearStorageData();
   await ses.clearCache();
   await ses.clearAuthCache();
   await ses.clearHostResolverCache();
   privacy.httpAllowed.clear();
-  for (const id of [...order]) closeTab(id);
+  sessionBlocked = 0;
+  sendTabs();
+}
+
+let burning = false;
+/** Pulsante "brucia tutto": riepilogo dei tracker bloccati, poi cancella e chiude oppure continua. */
+async function burn() {
+  if (!win || burning) return;
+  burning = true;
+  try {
+    const n = sessionBlocked;
+    const { response } = await dialog.showMessageBox(win, {
+      type: 'question',
+      title: 'Cancella tutto',
+      message: n === 1 ? 'In questa sessione Angerona ha bloccato 1 tracker.'
+        : `In questa sessione Angerona ha bloccato ${n.toLocaleString('it-IT')} tracker.`,
+      detail: 'Si chiudono tutte le schede e si cancellano cookie, cache, accessi e dati dei siti.',
+      buttons: ['Cancella e chiudi', 'Cancella e continua', 'Annulla'],
+      defaultId: 0,
+      cancelId: 2,
+      noLink: true,
+    });
+    if (response === 2) return;
+    await clearEverything();
+    if (response === 0) app.quit();
+    else sendUi('toast', 'Tutto cancellato: si riparte da zero');
+  } finally {
+    burning = false;
+  }
+}
+
+ipcMain.handle('data:clear', guard(async () => {
+  await clearEverything();
   return true;
 }));
+ipcMain.handle('data:burn', guard(() => burn()));
