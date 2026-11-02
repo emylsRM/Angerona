@@ -114,16 +114,32 @@
           <h2>Protezioni</h2>
           <label class="toggle"><input type="checkbox" name="httpsOnly"><span><b>Solo HTTPS</b><small>Apre i siti sempre in versione cifrata. Se un sito non la offre, te lo chiede.</small></span></label>
           <label class="toggle"><input type="checkbox" name="blockTrackers"><span><b>Blocca tracker e pubblicità</b><small id="filters-info">Liste EasyList ed EasyPrivacy.</small></span></label>
+          <label class="toggle"><input type="checkbox" name="blockThreats"><span><b>Blocca siti di truffa e malware</b><small id="threats-info">Liste URLhaus e Phishing Filter, controllate sul computer: nessun indirizzo viene inviato a terzi.</small></span></label>
           <label class="toggle"><input type="checkbox" name="blockThirdPartyCookies"><span><b>Blocca i cookie di terze parti</b><small>Impedisce ai siti esterni di seguirti di pagina in pagina. Qualche accesso incorporato potrebbe non funzionare.</small></span></label>
+          <label class="toggle"><input type="checkbox" name="reduceFingerprint"><span><b>Riduci l'impronta del browser</b><small>Grafica, audio e scheda video ricevono un piccolo disturbo diverso per ogni sito, così non ti riconoscono da un sito all'altro. Vale per le nuove schede.</small></span></label>
           <label class="toggle"><input type="checkbox" name="javascript"><span><b>JavaScript</b><small>Disattivarlo rende la navigazione più sicura ma molti siti smettono di funzionare. Vale per le nuove schede.</small></span></label>
           <div class="actions">
-            <button type="button" id="update-filters" class="btn ghost">Aggiorna liste dei tracker</button>
+            <button type="button" id="update-filters" class="btn ghost">Aggiorna le liste di protezione</button>
           </div>
+        </div>
+
+        <div class="card">
+          <h2>Sicurezza avanzata</h2>
+          <p class="muted">Protezioni in più che hanno un prezzo: accendile se ti servono.</p>
+          <label class="toggle"><input type="checkbox" name="hardened"><span><b>Modalità blindata</b><small>Spegne il compilatore veloce di JavaScript, da cui passa la maggior parte degli attacchi ai browser. I siti pesanti sono più lenti e alcuni giochi o editor online non funzionano. Vale dal prossimo avvio.</small></span></label>
+          <label class="toggle"><input type="checkbox" name="strictCerts"><span><b>Rifiuta i certificati aggiunti al computer</b><small>Blocca chi intercetta le connessioni cifrate: reti aziendali, programmi dannosi e alcuni antivirus (Avast, Kaspersky, ESET…) che controllano l'HTTPS. Con questi ultimi i siti non si aprono finché non spegni quella funzione dell'antivirus.</small></span></label>
         </div>
 
         <div class="card">
           <h2>Dati di navigazione</h2>
           <p class="muted">Cookie, cache e cronologia restano solo in memoria e spariscono alla chiusura. Puoi cancellarli anche adesso.</p>
+          <label class="field"><span>Cancellazione automatica</span><select name="autoClear">
+            <option value="0">Mai</option>
+            <option value="5">Dopo 5 minuti senza usare Angerona</option>
+            <option value="15">Dopo 15 minuti senza usare Angerona</option>
+            <option value="30">Dopo 30 minuti senza usare Angerona</option>
+          </select></label>
+          <p class="muted small">Il tempo parte quando Angerona va in secondo piano, viene ridotta a icona o blocchi il computer: poi tutte le schede si chiudono e i dati vengono cancellati.</p>
           <div class="actions">
             <button type="button" id="clear-data" class="btn danger">Cancella tutto adesso</button>
           </div>

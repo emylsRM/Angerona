@@ -1,0 +1,27 @@
+# Aggiornamenti automatici delle dipendenze, raggruppati in una sola richiesta per tipo.
+# Le correzioni di sicurezza arrivano subito, a parte (Dependabot security updates).
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly
+      time: '06:00'
+      timezone: Europe/Rome
+    groups:
+      azioni-github:
+        patterns: ['*']
+    commit-message:
+      prefix: 'Dipendenze'
+
+  - package-ecosystem: npm
+    directory: /desktop
+    schedule:
+      interval: monthly
+      time: '06:00'
+      timezone: Europe/Rome
+    groups:
+      desktop:
+        patterns: ['*']
+    commit-message:
+      prefix: 'Dipendenze'

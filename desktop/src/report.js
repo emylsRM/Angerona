@@ -25,12 +25,13 @@ function evaluate(s) {
   const dnsName = (DNS_PROVIDERS.find((p) => p.id === s.dns) || DNS_PROVIDERS[0]).label.split(' — ')[0];
 
   const parts = [
-    { id: 'base', value: 10, max: 10 },
+    { id: 'base', value: 5, max: 5 },
     { id: 'dns', value: !doh ? 0 : NO_LOG_DNS.has(s.dns) ? 20 : 15, max: 20 },
     { id: 'proxy', value: !hasProxy ? 0 : proxyEncrypted ? 25 : 15, max: 25 },
     { id: 'https', value: s.httpsOnly ? 15 : 0, max: 15 },
     { id: 'trackers', value: s.blockTrackers ? 15 : 0, max: 15 },
     { id: 'cookies', value: s.blockThirdPartyCookies ? 10 : 0, max: 10 },
+    { id: 'fingerprint', value: s.reduceFingerprint ? 5 : 0, max: 5 },
     { id: 'javascript', value: s.javascript ? 0 : 5, max: 5 },
   ];
   const score = parts.reduce((n, p) => n + p.value, 0);
@@ -50,9 +51,16 @@ function evaluate(s) {
       ? 'I servizi esterni incorporati (pulsanti social, video) non ricevono i loro cookie.'
       : 'I servizi esterni incorporati possono riconoscerti tra siti diversi finché il browser resta aperto.',
     'WebRTC non può rivelare il tuo indirizzo IP: le connessioni dirette passano solo da un proxy, se c\'è.',
-    "Possono calcolare un'impronta del browser (grafica, schermo, hardware): su Windows Angerona non la maschera ancora.",
+    s.reduceFingerprint
+      ? "Grafica, audio e scheda video ricevono un piccolo disturbo diverso per ogni sito: l'impronta del browser cambia da un sito all'altro. Schermo e caratteri restano visibili."
+      : "Possono calcolare un'impronta del browser (grafica, schermo, hardware) e riconoscerti tra siti diversi.",
+    'Non possono contattare il tuo computer né i dispositivi della rete di casa (router, stampanti, app in ascolto).',
+    s.blockThreats
+      ? 'I siti segnalati per truffe o malware vengono fermati prima di aprirsi.'
+      : 'I siti di truffa e malware non vengono bloccati.',
     'Non trovano cronologia precedente: cookie e dati spariscono alla chiusura.',
   ];
+  if (s.hardened) sites.push('Modalità blindata: JavaScript gira senza compilatore veloce, quindi è molto più difficile da attaccare.');
 
   const isp = [];
   if (hasProxy && proxyEncrypted) {
@@ -65,6 +73,7 @@ function evaluate(s) {
     isp.push('Vede i nomi di tutti i siti, anche dalle richieste DNS in chiaro, ma non i contenuti delle pagine HTTPS.');
   }
   if (!s.httpsOnly) isp.push('Può leggere le pagine dei siti che non usano HTTPS.');
+  if (s.strictCerts) isp.push('Se prova a intercettare le connessioni cifrate con un certificato aggiunto al computer, Angerona blocca la pagina.');
 
   const dns = [];
   if (hasProxy && proxy.mode === 'socks5') {
@@ -99,6 +108,7 @@ function evaluate(s) {
   if (!s.httpsOnly) tips.push({ text: 'Attiva «Solo HTTPS».', gain: 15 });
   if (!s.blockTrackers) tips.push({ text: 'Attiva il blocco di tracker e pubblicità.', gain: 15 });
   if (!s.blockThirdPartyCookies) tips.push({ text: 'Blocca i cookie di terze parti.', gain: 10 });
+  if (!s.reduceFingerprint) tips.push({ text: "Attiva la riduzione dell'impronta del browser.", gain: 5 });
   if (s.javascript) tips.push({ text: 'Disattivare JavaScript riduce ancora le informazioni sul dispositivo, ma molti siti smettono di funzionare.', gain: 5 });
 
   return { score, level: level(score), parts, observers, tips, vpnNote: !hasProxy };

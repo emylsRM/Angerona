@@ -219,6 +219,10 @@
   // ---------- Impostazioni ----------
   const panel = $('#panel');
   const form = $('#settings-form');
+  const CHECKBOXES = [
+    'httpsOnly', 'blockTrackers', 'blockThreats', 'blockThirdPartyCookies', 'reduceFingerprint', 'javascript',
+    'checkUpdates', 'hardened', 'strictCerts',
+  ];
   let savedSnapshot = '';
 
   function fillSelect(name, items) {
@@ -242,6 +246,13 @@
     if (!f || !f.rules) return 'Liste EasyList ed EasyPrivacy: in attesa del primo aggiornamento.';
     const when = f.updated ? new Date(f.updated).toLocaleDateString('it-IT', { day: 'numeric', month: 'long', year: 'numeric' }) : '';
     return `EasyList ed EasyPrivacy: ${f.rules.toLocaleString('it-IT')} regole, ${f.source}${when ? ` il ${when}` : ''}.`;
+  }
+
+  function threatsText(f) {
+    const base = 'Liste URLhaus e Phishing Filter, controllate sul computer: nessun indirizzo viene inviato a terzi.';
+    if (!f || !f.rules) return `${base} In attesa del primo aggiornamento.`;
+    const when = f.updated ? new Date(f.updated).toLocaleString('it-IT', { day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' }) : '';
+    return `${base} ${f.rules.toLocaleString('it-IT')} ${f.rules === 1 ? 'indirizzo' : 'indirizzi'}, ${f.source}${when ? ` il ${when}` : ''}.`;
   }
 
   // ---------- Pannello privacy ----------
@@ -312,8 +323,10 @@
     el.proxyPass.value = s.proxy.pass;
     el.search.value = s.search;
     el.searxngUrl.value = s.searxngUrl;
-    for (const k of ['httpsOnly', 'blockTrackers', 'blockThirdPartyCookies', 'javascript', 'checkUpdates']) el[k].checked = s[k];
+    for (const k of CHECKBOXES) el[k].checked = s[k];
+    el.autoClear.value = String(s.autoClear);
     $('#filters-info').textContent = filtersText(p.filters);
+    $('#threats-info').textContent = threatsText(p.threats);
     $('#about').textContent = `Angerona ${p.version} · ${p.engine}`;
     clearErrors();
     applyShowRules();
@@ -340,6 +353,11 @@
       blockThirdPartyCookies: el.blockThirdPartyCookies.checked,
       javascript: el.javascript.checked,
       checkUpdates: el.checkUpdates.checked,
+      blockThreats: el.blockThreats.checked,
+      reduceFingerprint: el.reduceFingerprint.checked,
+      strictCerts: el.strictCerts.checked,
+      hardened: el.hardened.checked,
+      autoClear: Number(el.autoClear.value),
     };
   }
 
@@ -369,7 +387,8 @@
     if (!res.ok) { showErrors(res.errors); return false; }
     fillForm(res.payload);
     renderToolbar();
-    notice(res.jsChanged ? 'Salvato. JavaScript cambia nelle nuove schede.' : 'Impostazioni applicate');
+    notice(res.restart ? 'Salvato. La modalità blindata cambia al prossimo avvio di Angerona.'
+      : res.jsChanged ? 'Salvato. La modifica vale per le nuove schede.' : 'Impostazioni applicate');
     return true;
   }
 
@@ -394,6 +413,7 @@
   api.on('settings', (p) => {
     payload = p;
     $('#filters-info').textContent = filtersText(p.filters);
+    $('#threats-info').textContent = threatsText(p.threats);
     renderToolbar();
   });
   form.addEventListener('change', () => { applyShowRules(); refreshReport(); });
@@ -442,7 +462,8 @@
     const r = await api.invoke('filters:update');
     if (r.ok) {
       $('#filters-info').textContent = filtersText(r.filters);
-      notice('Liste dei tracker aggiornate');
+      $('#threats-info').textContent = threatsText(r.threats);
+      notice('Liste di protezione aggiornate');
     } else {
       notice('Liste non raggiungibili, riprova più tardi');
     }

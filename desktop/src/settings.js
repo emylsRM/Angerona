@@ -44,7 +44,15 @@ const DEFAULTS = Object.freeze({
   blockThirdPartyCookies: true,
   javascript: true,
   checkUpdates: true,
+  blockThreats: true,
+  reduceFingerprint: true,
+  strictCerts: false,
+  hardened: false,
+  autoClear: 0,
 });
+
+// Minuti senza usare Angerona dopo i quali tutto viene cancellato (0 = mai).
+const AUTO_CLEAR_MINUTES = [0, 5, 15, 30];
 
 const clone = (o) => JSON.parse(JSON.stringify(o));
 const str = (v, max = 300) => (typeof v === 'string' ? v.trim().slice(0, max) : '');
@@ -98,6 +106,11 @@ function sanitize(input, previous = DEFAULTS) {
   s.blockThirdPartyCookies = bool(i.blockThirdPartyCookies, s.blockThirdPartyCookies);
   s.javascript = bool(i.javascript, s.javascript);
   s.checkUpdates = bool(i.checkUpdates, s.checkUpdates);
+  s.blockThreats = bool(i.blockThreats, s.blockThreats);
+  s.reduceFingerprint = bool(i.reduceFingerprint, s.reduceFingerprint);
+  s.strictCerts = bool(i.strictCerts, s.strictCerts);
+  s.hardened = bool(i.hardened, s.hardened);
+  if (AUTO_CLEAR_MINUTES.includes(Number(i.autoClear))) s.autoClear = Number(i.autoClear);
   return { settings: s, errors };
 }
 
@@ -151,6 +164,6 @@ class SettingsStore {
 }
 
 module.exports = {
-  DNS_PROVIDERS, SEARCH_ENGINES, PROXY_MODES, DEFAULTS,
+  DNS_PROVIDERS, SEARCH_ENGINES, PROXY_MODES, DEFAULTS, AUTO_CLEAR_MINUTES,
   sanitize, dohTemplate, searchUrl, SettingsStore,
 };
