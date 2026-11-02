@@ -48,7 +48,7 @@ public final class Settings {
     public static final String[][] FINGERPRINT = {
         {"standard", "Standard di Firefox"},
         {"rafforzata", "Rafforzata — consigliata"},
-        {"massima", "Massima — come Tor: ora UTC e lingua inglese per i siti"},
+        {"massima", "Massima — come Tor: ora UTC e siti in inglese"},
     };
 
     public static final String[][] PROXY = {

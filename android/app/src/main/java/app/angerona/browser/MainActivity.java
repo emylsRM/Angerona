@@ -258,12 +258,14 @@ public class MainActivity extends Activity {
     // ---------- Schede ----------
 
     private Tab createTab() {
-        GeckoSession session = new GeckoSession(new GeckoSessionSettings.Builder()
+        GeckoSessionSettings.Builder b = new GeckoSessionSettings.Builder()
             .usePrivateMode(true)
             .useTrackingProtection(true)
             .userAgentMode(GeckoSessionSettings.USER_AGENT_MODE_MOBILE)
-            .viewportMode(GeckoSessionSettings.VIEWPORT_MODE_MOBILE)
-            .build());
+            .viewportMode(GeckoSessionSettings.VIEWPORT_MODE_MOBILE);
+        String ua = Engine.userAgent(engine.settings());
+        if (ua != null) b.userAgentOverride(ua);
+        GeckoSession session = new GeckoSession(b.build());
         Tab tab = new Tab(session);
         attach(tab, session);
         return tab;
