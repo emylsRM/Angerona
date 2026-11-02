@@ -9,12 +9,17 @@ Browser privato e leggero per **Windows** e **Android**, con il nome della dea r
 - **Punteggio privacy**: nelle impostazioni un valore da 0 a 100 che cambia mentre modifichi le opzioni, con la spiegazione di cosa vedono i siti, il tuo operatore, il servizio DNS e il proxy. Da lì apri anche i test indipendenti (Mullvad, EFF Cover Your Tracks, BrowserLeaks).
 - **Aggiornamenti**: all'apertura avvisa se su GitHub c'è una versione nuova e la installa con un tocco, verificandone l'integrità.
 - **Protezioni**: blocco di tracker e pubblicità, cookie di terze parti bloccati, solo HTTPS, Global Privacy Control, nessun permesso a fotocamera, microfono, posizione e notifiche.
+- **Sicurezza**: siti di truffa e malware bloccati, rete di casa irraggiungibile dalle pagine web, impronta del browser ridotta, pulsante con la fiamma per cancellare tutto subito. In più, a scelta: modalità blindata, cancellazione automatica, blocco con impronta o PIN (Android), rifiuto dei certificati aggiunti al computer (Windows).
 
 | | Windows | Android |
 |---|---|---|
 | Motore | Chromium (Electron 45) | Firefox (GeckoView 159) |
 | Blocco tracker | EasyList + EasyPrivacy, aggiornate ogni settimana | Protezione antitracciamento rigorosa di Firefox |
-| Fughe di IP via WebRTC | bloccate | gestite da Firefox |
+| Fughe di IP via WebRTC | bloccate | WebRTC spento (attivabile, passa solo dal proxy) |
+| Siti di truffa e malware | URLhaus + Phishing Filter, aggiornate ogni 12 ore | Safe Browsing di Firefox |
+| Rete locale (router, app sul dispositivo) | non raggiungibile dalle pagine web | non raggiungibile dalle pagine web |
+| Impronta del browser | disturbo su grafica e audio, hardware generico | protezione di Firefox rafforzata |
+| Modalità blindata | JavaScript senza JIT né WebAssembly | JavaScript senza JIT + processi isolati di Android |
 | Password del proxy | cifrata con Windows (DPAPI) | cifrata con il Keystore di Android |
 
 ---
@@ -84,6 +89,21 @@ Per chiedere una modifica o una nuova funzione apri una **issue** (scheda Issues
 | Proxy aziendale con accesso | HTTP | indirizzo del proxy | porta del proxy |
 
 Su Windows il motore Chromium non supporta SOCKS5 con nome utente e password: per un proxy con accesso usa il tipo HTTP. Su Android SOCKS5 con password funziona.
+
+## Sicurezza: cosa fa Angerona e cosa puoi attivare
+
+Sempre attivo:
+- **Siti pericolosi**: gli indirizzi segnalati per truffe o malware si fermano su una pagina di avviso, con «Apri comunque» per chi sa cosa sta facendo. Il controllo avviene sul dispositivo: nessun indirizzo visitato viene inviato a terzi (su Android con Safe Browsing di Firefox, che usa impronte parziali).
+- **Rete di casa protetta**: una pagina su Internet non può contattare il router, la stampante o i programmi in ascolto sul dispositivo. È il trucco usato nel 2025 da Meta e Yandex per collegare la navigazione alle loro app.
+- **Indirizzi truccati** (Android): domini che imitano siti noti con lettere straniere sono mostrati come `xn--…`.
+- **Niente collegamenti in chiaro o anticipati**: in modalità Solo HTTPS nessuna richiesta di prova non cifrata, nessuna connessione preparata verso link non aperti.
+- **App difficile da manipolare** (Windows): niente modalità debug né esecuzione come Node, file dell'app controllati, pagine salvate sul disco che non leggono altri file, download segnalati a SmartScreen.
+
+Da attivare nelle impostazioni, perché hanno un prezzo:
+- **Modalità blindata**: JavaScript senza compilatore veloce, da cui passa la maggior parte degli attacchi ai browser (su Android anche processi isolati). Siti pesanti più lenti, alcuni giochi o editor online non funzionano.
+- **Cancellazione automatica**: dopo 5, 15 o 30 minuti senza usare Angerona chiude tutte le schede e cancella i dati.
+- **Blocco con impronta o PIN** (Android): al ritorno nell'app serve sbloccarla; le app recenti non mostrano le schede.
+- **Rifiuta i certificati aggiunti al computer** (Windows): blocca chi intercetta l'HTTPS (reti aziendali, programmi dannosi, alcuni antivirus).
 
 ## Cosa sapere, onestamente
 

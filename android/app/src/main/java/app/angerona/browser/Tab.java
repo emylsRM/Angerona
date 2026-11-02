@@ -14,6 +14,9 @@ final class Tab {
     boolean canForward;
     int progress;
     int blocked;
+    /** Arresti del processo della pagina ravvicinati: oltre un limite non si ricarica più. */
+    int crashes;
+    long firstCrashAt;
 
     Tab(GeckoSession session) {
         this.session = session;

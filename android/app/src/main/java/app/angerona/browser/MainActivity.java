@@ -2,6 +2,7 @@ package app.angerona.browser;
 
 import android.app.Activity;
 import android.app.AlertDialog;
+import android.app.Application;
 import android.content.ActivityNotFoundException;
 import android.content.ClipData;
 import android.content.ClipboardManager;
@@ -11,18 +12,25 @@ import android.graphics.Color;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.Looper;
+import android.os.SystemClock;
 import android.text.Editable;
 import android.text.TextWatcher;
+import android.view.Gravity;
 import android.view.KeyEvent;
 import android.view.Menu;
 import android.view.View;
+import android.view.ViewGroup;
 import android.view.WindowInsets;
 import android.view.WindowInsetsController;
 import android.view.WindowManager;
 import android.view.inputmethod.EditorInfo;
 import android.view.inputmethod.InputMethodManager;
+import android.widget.Button;
 import android.widget.EditText;
 import android.widget.ImageView;
+import android.widget.LinearLayout;
 import android.widget.PopupMenu;
 import android.widget.ProgressBar;
 import android.widget.TextView;
@@ -77,6 +85,39 @@ public class MainActivity extends Activity {
     private Object backCallback;
     private boolean backRegistered;
 
+    // ---------- Blocco e cancellazione automatica ----------
+    private final Handler handler = new Handler(Looper.getMainLooper());
+    private View lockOverlay;
+    private boolean locked;
+    /** Lo sblocco viene proposto da solo una volta per ritorno nell'app; poi c'è il pulsante. */
+    private boolean autoPrompted;
+    private boolean authenticating;
+    /** Aperta un'app esterna per un risultato (scelta file, PIN di sistema): non conta come uscita. */
+    private boolean awaitingExternal;
+    /** Qualche sito è stato aperto dall'ultima cancellazione. */
+    private boolean dirty;
+    private long backgroundAt = -1;
+    private int startedActivities;
+    private String pendingNotice;
+    private final Runnable autoClearTask = this::runAutoClear;
+    private final Application.ActivityLifecycleCallbacks lifecycle = new Application.ActivityLifecycleCallbacks() {
+        @Override public void onActivityCreated(Activity a, Bundle b) { }
+        @Override public void onActivityResumed(Activity a) { }
+        @Override public void onActivityPaused(Activity a) { }
+        @Override public void onActivitySaveInstanceState(Activity a, Bundle b) { }
+        @Override public void onActivityDestroyed(Activity a) { }
+
+        @Override
+        public void onActivityStarted(Activity a) {
+            if (++startedActivities == 1) onAppForeground();
+        }
+
+        @Override
+        public void onActivityStopped(Activity a) {
+            if (--startedActivities == 0 && !a.isChangingConfigurations()) onAppBackground();
+        }
+    };
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -99,6 +140,9 @@ public class MainActivity extends Activity {
         setupBack();
 
         engine = Engine.get(this);
+        lockOverlay = buildLockOverlay();
+        if (engine.settings().appLock && AppLock.available(this)) setLocked(true);
+        getApplication().registerActivityLifecycleCallbacks(lifecycle);
         prompts = new Prompts(this);
         updater = new Updater(this, engine, url -> newTab(url, true, true));
         pendingUrl = urlFromIntent(getIntent());
@@ -150,6 +194,106 @@ public class MainActivity extends Activity {
         } else {
             getWindow().clearFlags(WindowManager.LayoutParams.FLAG_SECURE);
         }
+        // Con il blocco attivo le app recenti non mostrano l'anteprima delle schede.
+        if (Build.VERSION.SDK_INT >= 33 && engine != null) setRecentsScreenshotEnabled(!engine.settings().appLock);
+    }
+
+    // ---------- Blocco con impronta o PIN ----------
+
+    private View buildLockOverlay() {
+        LinearLayout box = new LinearLayout(this);
+        box.setOrientation(LinearLayout.VERTICAL);
+        box.setGravity(Gravity.CENTER);
+        box.setBackgroundColor(getColor(R.color.page));
+        box.setClickable(true);
+        box.setFocusable(true);
+        int pad = (int) (32 * getResources().getDisplayMetrics().density);
+        box.setPadding(pad, pad, pad, pad);
+
+        ImageView icon = new ImageView(this);
+        icon.setImageResource(R.mipmap.ic_launcher);
+        int size = (int) (88 * getResources().getDisplayMetrics().density);
+        box.addView(icon, new LinearLayout.LayoutParams(size, size));
+
+        TextView title = new TextView(this);
+        title.setText("Angerona è bloccata");
+        title.setTextSize(22);
+        title.setTextColor(getColor(R.color.text));
+        title.setGravity(Gravity.CENTER);
+        title.setPadding(0, pad / 2, 0, pad / 4);
+        box.addView(title);
+
+        TextView sub = new TextView(this);
+        sub.setText("Sbloccala con l'impronta, il volto o il PIN del telefono.");
+        sub.setTextSize(14);
+        sub.setTextColor(getColor(R.color.text2));
+        sub.setGravity(Gravity.CENTER);
+        box.addView(sub);
+
+        Button unlock = new Button(this);
+        unlock.setText("Sblocca");
+        unlock.setAllCaps(false);
+        unlock.setTextColor(getColor(R.color.text));
+        unlock.setBackgroundResource(R.drawable.bg_button_primary);
+        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
+            LinearLayout.LayoutParams.WRAP_CONTENT, (int) (48 * getResources().getDisplayMetrics().density));
+        lp.topMargin = pad;
+        unlock.setMinWidth(size * 2);
+        unlock.setOnClickListener(v -> unlock());
+        box.addView(unlock, lp);
+
+        box.setVisibility(View.GONE);
+        addContentView(box, new ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
+        return box;
+    }
+
+    private void setLocked(boolean on) {
+        locked = on;
+        lockOverlay.setVisibility(on ? View.VISIBLE : View.GONE);
+        if (on) {
+            hideKeyboard(address);
+            if (current != null && current.session.isOpen()) current.session.setActive(false);
+        } else if (current != null && current.session.isOpen()) {
+            current.session.setActive(true);
+        }
+    }
+
+    private void unlock() {
+        if (!locked || authenticating) return;
+        authenticating = true;
+        AppLock.authenticate(this, ok -> {
+            authenticating = false;
+            if (ok) setLocked(false);
+        });
+    }
+
+    // ---------- Uscita dall'app: blocco e cancellazione automatica ----------
+
+    private void onAppBackground() {
+        if (awaitingExternal || isFinishing()) return;
+        Settings s = engine.settings();
+        backgroundAt = SystemClock.elapsedRealtime();
+        if (s.appLock && AppLock.available(this)) setLocked(true);
+        autoPrompted = false;
+        handler.removeCallbacks(autoClearTask);
+        if (s.autoClear > 0) handler.postDelayed(autoClearTask, s.autoClear * 60_000L);
+    }
+
+    private void onAppForeground() {
+        handler.removeCallbacks(autoClearTask);
+        Settings s = engine.settings();
+        if (backgroundAt >= 0 && s.autoClear > 0 && SystemClock.elapsedRealtime() - backgroundAt >= s.autoClear * 60_000L) {
+            runAutoClear();
+        }
+        backgroundAt = -1;
+    }
+
+    /** Scatta in background (o al ritorno, se Android ha ritardato il timer): niente avvisi su altre app. */
+    private void runAutoClear() {
+        int minutes = engine.settings().autoClear;
+        if (!ready || !dirty || minutes <= 0) return;
+        pendingNotice = "Tracce cancellate automaticamente dopo " + minutes + " minuti senza usare Angerona";
+        clearAll(false, "");
     }
 
     private void setFullscreen(boolean on) {
@@ -342,6 +486,7 @@ public class MainActivity extends Activity {
             @Override
             public void onLocationChange(GeckoSession s, String url, List<GeckoSession.PermissionDelegate.ContentPermission> perms, Boolean hasUserGesture) {
                 tab.url = url == null ? "" : url;
+                if (tab.url.startsWith("http:") || tab.url.startsWith("https:")) dirty = true;
                 if (!tab.internal()) tab.errorUrl = null;
                 if (tab == current) render();
             }
@@ -499,6 +644,10 @@ public class MainActivity extends Activity {
     private void recover(Tab tab) {
         if (!tabs.contains(tab)) return;
         String url = tab.internal() ? null : tab.url;
+        // Più di 3 arresti in 30 secondi: si smette di ricaricare per non entrare in un ciclo infinito.
+        long now = SystemClock.elapsedRealtime();
+        if (now - tab.firstCrashAt > 30_000) { tab.firstCrashAt = now; tab.crashes = 0; }
+        boolean loop = ++tab.crashes > 3;
         boolean wasCurrent = tab == current;
         if (wasCurrent && geckoView.getSession() != null) geckoView.releaseSession();
         if (tab.session.isOpen()) tab.session.close();
@@ -509,6 +658,11 @@ public class MainActivity extends Activity {
         if (wasCurrent) {
             geckoView.setSession(tab.session);
             tab.session.setActive(true);
+        }
+        if (loop) {
+            tab.errorUrl = url;
+            tab.session.load(new GeckoSession.Loader().data(Pages.crashLoop(url), "text/html"));
+            return;
         }
         if (url == null) loadStart(tab); else tab.session.loadUri(url);
         Toast.makeText(this, "La pagina si era bloccata ed è stata ricaricata", Toast.LENGTH_SHORT).show();
@@ -667,20 +821,32 @@ public class MainActivity extends Activity {
     /** Chiude tutte le schede e cancella cookie, cache e dati dei siti. */
     private void clearAll(boolean exit, String message) {
         sessionBlocked = 0;
+        dirty = false;
         if (geckoView.getSession() != null) geckoView.releaseSession();
         for (Tab t : tabs) t.session.close();
         tabs.clear();
         current = null;
         engine.runtime.getStorageController().clearData(StorageController.ClearFlags.ALL).accept(v -> {
             if (exit) {
-                finishAndRemoveTask();
+                exitCompletely();
             } else {
                 newTab(null, true, true);
-                Toast.makeText(this, message != null ? message : "Dati di navigazione cancellati", Toast.LENGTH_SHORT).show();
+                if (!"".equals(message)) {
+                    Toast.makeText(this, message != null ? message : "Dati di navigazione cancellati", Toast.LENGTH_SHORT).show();
+                }
             }
         }, e -> {
-            if (exit) finishAndRemoveTask(); else newTab(null, true, true);
+            if (exit) exitCompletely(); else newTab(null, true, true);
         });
+    }
+
+    /**
+     * Chiude l'app e termina il processo: in memoria non resta nulla e al prossimo avvio il motore
+     * riparte da zero (serve anche ad attivare o spegnere la gabbia della modalità blindata).
+     */
+    private void exitCompletely() {
+        finishAndRemoveTask();
+        handler.postDelayed(() -> android.os.Process.killProcess(android.os.Process.myPid()), 500);
     }
 
     // ---------- Trova nella pagina ----------
@@ -789,11 +955,43 @@ public class MainActivity extends Activity {
     protected void onResume() {
         super.onResume();
         applyScreenProtection();
+        if (pendingNotice != null) {
+            Toast.makeText(this, pendingNotice, Toast.LENGTH_LONG).show();
+            pendingNotice = null;
+        }
+        if (locked) {
+            lockOverlay.setVisibility(View.VISIBLE);
+            if (!autoPrompted) { autoPrompted = true; unlock(); }
+        } else {
+            lockOverlay.setVisibility(View.GONE);
+        }
+    }
+
+    @Override
+    protected void onPause() {
+        super.onPause();
+        // Con il blocco attivo il contenuto si copre subito, prima che Android ne faccia l'anteprima.
+        if (engine != null && engine.settings().appLock && AppLock.available(this) && !awaitingExternal && !authenticating) {
+            lockOverlay.setVisibility(View.VISIBLE);
+        }
+    }
+
+    @Override
+    public void startActivityForResult(Intent intent, int requestCode, Bundle options) {
+        boolean internal = intent.getComponent() != null && getPackageName().equals(intent.getComponent().getPackageName());
+        if (!internal) awaitingExternal = true;
+        super.startActivityForResult(intent, requestCode, options);
     }
 
     @Override
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
         super.onActivityResult(requestCode, resultCode, data);
+        awaitingExternal = false;
+        if (requestCode == AppLock.REQUEST_UNLOCK) {
+            authenticating = false;
+            if (resultCode == RESULT_OK) setLocked(false);
+            return;
+        }
         if (requestCode == Prompts.REQUEST_FILE) {
             prompts.onFileResult(resultCode, data);
         } else if (requestCode == REQUEST_SETTINGS) {
@@ -817,6 +1015,8 @@ public class MainActivity extends Activity {
 
     @Override
     protected void onDestroy() {
+        getApplication().unregisterActivityLifecycleCallbacks(lifecycle);
+        handler.removeCallbacksAndMessages(null);
         if (isFinishing()) {
             if (geckoView.getSession() != null) geckoView.releaseSession();
             for (Tab t : tabs) if (t.session.isOpen()) t.session.close();

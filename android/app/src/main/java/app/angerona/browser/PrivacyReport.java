@@ -108,6 +108,9 @@ final class PrivacyReport {
         sites.sees.add(s.blockThirdPartyCookies
             ? "I servizi esterni incorporati non ricevono cookie."
             : "I cookie dei servizi esterni restano isolati sito per sito: non possono seguirti tra siti diversi.");
+        sites.sees.add("Non possono contattare i dispositivi della rete di casa (router, stampanti) né le app sul telefono.");
+        sites.sees.add("Gli indirizzi truccati con lettere straniere (come «аpple.com» con la «а» cirillica) si vedono per quello che sono.");
+        if (s.hardened) sites.sees.add("Modalità blindata: JavaScript gira senza compilatore veloce e le pagine in una gabbia di Android, quindi è molto più difficile da attaccare.");
         sites.sees.add("Non trovano cronologia precedente: le schede private si cancellano alla chiusura.");
         r.observers.add(sites);
 
