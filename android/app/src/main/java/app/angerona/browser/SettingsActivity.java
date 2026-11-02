@@ -26,6 +26,8 @@ public class SettingsActivity extends Activity {
     private Spinner dns;
     private Spinner proxy;
     private Spinner search;
+    private Spinner fingerprint;
+    private Switch webrtc;
     private EditText nextdns;
     private EditText doh;
     private EditText host;
@@ -66,6 +68,8 @@ public class SettingsActivity extends Activity {
         dns = findViewById(R.id.spinner_dns);
         proxy = findViewById(R.id.spinner_proxy);
         search = findViewById(R.id.spinner_search);
+        fingerprint = findViewById(R.id.spinner_fingerprint);
+        webrtc = findViewById(R.id.switch_webrtc);
         nextdns = findViewById(R.id.input_nextdns);
         doh = findViewById(R.id.input_doh);
         host = findViewById(R.id.input_host);
@@ -89,11 +93,14 @@ public class SettingsActivity extends Activity {
         dns.setAdapter(adapter(Settings.labels(Settings.DNS)));
         proxy.setAdapter(adapter(Settings.labels(Settings.PROXY)));
         search.setAdapter(adapter(Settings.labels(Settings.SEARCH)));
+        fingerprint.setAdapter(adapter(Settings.labels(Settings.FINGERPRINT)));
 
         Settings s = Engine.get(this).settings();
         dns.setSelection(Settings.indexOf(Settings.DNS, s.dns));
         proxy.setSelection(Settings.indexOf(Settings.PROXY, s.proxyMode));
         search.setSelection(Settings.indexOf(Settings.SEARCH, s.search));
+        fingerprint.setSelection(Settings.indexOf(Settings.FINGERPRINT, s.fingerprint));
+        webrtc.setChecked(s.webrtc);
         nextdns.setText(s.nextdnsId);
         doh.setText(s.customDoh);
         host.setText(s.proxyHost);
@@ -115,7 +122,8 @@ public class SettingsActivity extends Activity {
         dns.setOnItemSelectedListener(refresh);
         proxy.setOnItemSelectedListener(refresh);
         search.setOnItemSelectedListener(refresh);
-        for (Switch sw : new Switch[] {https, trackers, cookies, js}) {
+        fingerprint.setOnItemSelectedListener(refresh);
+        for (Switch sw : new Switch[] {https, trackers, cookies, js, webrtc}) {
             sw.setOnCheckedChangeListener((b, checked) -> updateReport());
         }
         host.addTextChangedListener(new TextWatcher() {
@@ -223,6 +231,8 @@ public class SettingsActivity extends Activity {
         s.javascript = js.isChecked();
         s.secureScreen = secure.isChecked();
         s.checkUpdates = updates.isChecked();
+        s.fingerprint = selected(fingerprint, Settings.FINGERPRINT);
+        s.webrtc = webrtc.isChecked();
         return s;
     }
 

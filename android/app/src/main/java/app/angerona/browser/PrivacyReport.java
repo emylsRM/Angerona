@@ -9,7 +9,8 @@ import java.util.Set;
 
 /**
  * Valutazione della privacy a partire dalle impostazioni: punteggio, chi vede cosa, come migliorare.
- * La stessa logica esiste in desktop/src/report.js: se cambi qui, cambia anche là.
+ * La base è la stessa di desktop/src/report.js; qui in più contano impronta del browser e WebRTC,
+ * che su Android sono configurabili.
  */
 final class PrivacyReport {
     static final class Observer {
@@ -76,7 +77,9 @@ final class PrivacyReport {
         int proxyPoints = !hasProxy ? 0 : proxyEncrypted ? 25 : 15;
         int trackerPoints = s.blockTrackers ? 15 : 8; // la protezione standard di Firefox resta attiva
         int cookiePoints = s.blockThirdPartyCookies ? 10 : 6; // senza blocco i cookie restano isolati per sito
-        r.score = 10 + dnsPoints + proxyPoints + (s.httpsOnly ? 15 : 0) + trackerPoints + cookiePoints + (s.javascript ? 0 : 5);
+        int fingerprintPoints = "massima".equals(s.fingerprint) ? 5 : "rafforzata".equals(s.fingerprint) ? 3 : 0;
+        r.score = 5 + dnsPoints + proxyPoints + (s.httpsOnly ? 15 : 0) + trackerPoints + cookiePoints
+            + fingerprintPoints + (s.javascript ? 0 : 5);
         r.level = level(r.score);
         r.vpnNote = !hasProxy;
 
@@ -85,8 +88,20 @@ final class PrivacyReport {
             ? "Vedono l'indirizzo IP del proxy, non il tuo."
             : "Vedono il tuo indirizzo IP e la zona da cui ti colleghi, a meno che sul telefono sia attiva un'app VPN.");
         sites.sees.add(s.javascript
-            ? "Vedono il tipo di browser e la lingua; Firefox maschera parte dei dettagli del telefono."
+            ? "Vedono il tipo di browser e la lingua."
             : "Vedono solo il tipo di browser e la lingua: senza JavaScript non leggono altri dettagli del telefono.");
+        if ("massima".equals(s.fingerprint)) {
+            sites.sees.add("Grafica, audio, schermo e caratteri sono mascherati e cambiano a ogni sessione; in più vedono ora UTC e formati inglesi, come chi usa Tor Browser.");
+        } else if ("rafforzata".equals(s.fingerprint)) {
+            sites.sees.add("Grafica, audio, schermo e caratteri sono mascherati e cambiano a ogni sessione: l'impronta non ti segue da una sessione all'altra.");
+        } else {
+            sites.sees.add("L'impronta del browser è protetta solo dalle difese standard di Firefox.");
+        }
+        sites.sees.add(!s.webrtc
+            ? "WebRTC è spento: non può rivelare il tuo indirizzo IP."
+            : hasProxy
+                ? "WebRTC passa solo dal proxy: non rivela il tuo indirizzo IP."
+                : "WebRTC può mostrare il tuo IP pubblico, che i siti vedono comunque senza proxy o VPN.");
         sites.sees.add(s.blockTrackers
             ? "Tracker, cryptominer e tracciamento social vengono bloccati in modo rigoroso."
             : "Vengono bloccati solo i tracker più noti (protezione standard).");
@@ -134,6 +149,8 @@ final class PrivacyReport {
         if (!s.httpsOnly) r.tips.add(new Tip("Attiva «Solo HTTPS».", 15));
         if (!s.blockTrackers) r.tips.add(new Tip("Attiva la protezione rigorosa dai tracker.", 7));
         if (!s.blockThirdPartyCookies) r.tips.add(new Tip("Blocca del tutto i cookie di terze parti.", 4));
+        if ("standard".equals(s.fingerprint)) r.tips.add(new Tip("Scegli la protezione dall'impronta «Rafforzata».", 3));
+        else if ("rafforzata".equals(s.fingerprint)) r.tips.add(new Tip("Con l'impronta «Massima» sembri uguale a molti altri utenti (ora UTC, formati inglesi).", 2));
         if (s.javascript) r.tips.add(new Tip("Disattivare JavaScript riduce ancora le informazioni sul telefono, ma molti siti smettono di funzionare.", 5));
         return r;
     }

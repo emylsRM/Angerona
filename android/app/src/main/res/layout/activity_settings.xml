@@ -241,6 +241,17 @@
                 <TextView style="@style/Angerona.Help" android:text="Blocca tracker, cryptominer, fingerprinting e tracciamento social. Se disattivata resta la protezione standard." />
                 <Switch android:id="@+id/switch_cookies" style="@style/Angerona.Switch" android:text="Blocca i cookie di terze parti" />
                 <TextView style="@style/Angerona.Help" android:text="Altrimenti i cookie esterni restano comunque isolati sito per sito." />
+                <TextView style="@style/Angerona.Label" android:text="Protezione dall'impronta del browser" />
+                <Spinner
+                    android:id="@+id/spinner_fingerprint"
+                    android:layout_width="match_parent"
+                    android:layout_height="48dp"
+                    android:layout_marginTop="4dp"
+                    android:background="@drawable/bg_input"
+                    android:popupBackground="@drawable/bg_popup" />
+                <TextView style="@style/Angerona.Help" android:layout_marginTop="6dp" android:text="Rende diversi a ogni sessione i dati con cui i siti riconoscono il telefono (grafica, audio, schermo, caratteri). «Massima» mostra ai siti ora UTC e formati inglesi, come Tor Browser." />
+                <Switch android:id="@+id/switch_webrtc" style="@style/Angerona.Switch" android:text="WebRTC" />
+                <TextView style="@style/Angerona.Help" android:text="Serve a chiamate e trasferimenti diretti nel browser. Spento non può rivelare il tuo indirizzo IP; acceso, con un proxy passa solo dal proxy." />
                 <Switch android:id="@+id/switch_js" style="@style/Angerona.Switch" android:text="JavaScript" />
                 <TextView style="@style/Angerona.Help" android:text="Disattivarlo è più sicuro ma molti siti smettono di funzionare." />
                 <Switch android:id="@+id/switch_secure" style="@style/Angerona.Switch" android:text="Nascondi lo schermo" />
