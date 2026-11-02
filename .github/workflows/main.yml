@@ -21,7 +21,8 @@ jobs:
         with:
           distribution: temurin
           java-version: '21'
-      - uses: android-actions/setup-android@v3
+      - name: Licenze Android
+        run: yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses > /dev/null || true
       - name: Chiave di firma (facoltativa)
         env:
           KEYSTORE_BASE64: ${{ secrets.ANGERONA_KEYSTORE_BASE64 }}
