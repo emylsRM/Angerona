@@ -150,7 +150,7 @@
     const b = $('#burn');
     const shown = n > 9999 ? '9999+' : n.toLocaleString('it-IT');
     b.innerHTML = svg('flame', 16) + (n > 0 ? `<span>${shown}</span>` : '');
-    b.title = `${n === 1 ? '1 tracker bloccato' : `${shown} tracker bloccati`} in questa sessione. Clicca per cancellare tutto (Ctrl+Maiusc+Canc)`;
+    b.title = `${n === 1 ? '1 tracker bloccato' : `${shown} tracker bloccati`} in questa sessione. Clicca per chiudere tutto e cancellare le tracce subito (Ctrl+Maiusc+Canc)`;
   }
   renderBurn(0);
   api.on('session', (s) => renderBurn(Number(s && s.blocked) || 0));
