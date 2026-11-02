@@ -13,5 +13,6 @@
     <color name="page">#FF16132F</color>
     <color name="ok">#FF5DCAA5</color>
     <color name="warn">#FFF0997B</color>
+    <color name="amber">#FFEF9F27</color>
     <color name="ic_launcher_background">#FF26215C</color>
 </resources>

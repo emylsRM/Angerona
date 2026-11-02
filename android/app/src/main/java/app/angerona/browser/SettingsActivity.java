@@ -5,12 +5,15 @@ import android.app.AlertDialog;
 import android.content.Intent;
 import android.os.Build;
 import android.os.Bundle;
+import android.text.Editable;
+import android.text.TextWatcher;
 import android.view.View;
 import android.view.WindowInsets;
 import android.view.WindowManager;
 import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
 import android.widget.EditText;
+import android.widget.LinearLayout;
 import android.widget.Spinner;
 import android.widget.Switch;
 import android.widget.TextView;
@@ -35,6 +38,12 @@ public class SettingsActivity extends Activity {
     private Switch cookies;
     private Switch js;
     private Switch secure;
+    private TextView scoreValue;
+    private TextView scoreLevel;
+    private TextView tipsTitle;
+    private TextView vpnNote;
+    private LinearLayout observersBox;
+    private LinearLayout tipsBox;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -68,6 +77,12 @@ public class SettingsActivity extends Activity {
         cookies = findViewById(R.id.switch_cookies);
         js = findViewById(R.id.switch_js);
         secure = findViewById(R.id.switch_secure);
+        scoreValue = findViewById(R.id.score_value);
+        scoreLevel = findViewById(R.id.score_level);
+        tipsTitle = findViewById(R.id.tips_title);
+        vpnNote = findViewById(R.id.vpn_note);
+        observersBox = findViewById(R.id.observers_box);
+        tipsBox = findViewById(R.id.tips_box);
 
         dns.setAdapter(adapter(Settings.labels(Settings.DNS)));
         proxy.setAdapter(adapter(Settings.labels(Settings.PROXY)));
@@ -91,13 +106,22 @@ public class SettingsActivity extends Activity {
         secure.setChecked(s.secureScreen);
 
         AdapterView.OnItemSelectedListener refresh = new AdapterView.OnItemSelectedListener() {
-            @Override public void onItemSelected(AdapterView<?> parent, View view, int position, long id) { updateVisibility(); }
+            @Override public void onItemSelected(AdapterView<?> parent, View view, int position, long id) { updateVisibility(); updateReport(); }
             @Override public void onNothingSelected(AdapterView<?> parent) { }
         };
         dns.setOnItemSelectedListener(refresh);
         proxy.setOnItemSelectedListener(refresh);
         search.setOnItemSelectedListener(refresh);
+        for (Switch sw : new Switch[] {https, trackers, cookies, js}) {
+            sw.setOnCheckedChangeListener((b, checked) -> updateReport());
+        }
+        host.addTextChangedListener(new TextWatcher() {
+            @Override public void beforeTextChanged(CharSequence t, int a, int b, int c) { }
+            @Override public void onTextChanged(CharSequence t, int a, int b, int c) { }
+            @Override public void afterTextChanged(Editable e) { updateReport(); }
+        });
         updateVisibility();
+        updateReport();
 
         ((TextView) findViewById(R.id.about)).setText("Angerona 1.0.0 · motore Firefox (GeckoView)");
 
@@ -113,6 +137,21 @@ public class SettingsActivity extends Activity {
                 setResult(RESULT_OK, new Intent().putExtra(MainActivity.EXTRA_ACTION, "check"));
                 finish();
             }
+        });
+        findViewById(R.id.btn_tests).setOnClickListener(v -> {
+            String[] names = new String[PrivacyReport.TESTS.length];
+            for (int i = 0; i < names.length; i++) names[i] = PrivacyReport.TESTS[i][0];
+            new AlertDialog.Builder(this)
+                .setTitle("Test della privacy")
+                .setItems(names, (d, which) -> {
+                    if (save()) {
+                        setResult(RESULT_OK, new Intent()
+                            .putExtra(MainActivity.EXTRA_ACTION, "open")
+                            .putExtra(MainActivity.EXTRA_URL, PrivacyReport.TESTS[which][1]));
+                        finish();
+                    }
+                })
+                .show();
         });
         findViewById(R.id.btn_clear).setOnClickListener(v -> new AlertDialog.Builder(this)
             .setTitle("Cancellare tutto?")
@@ -156,9 +195,9 @@ public class SettingsActivity extends Activity {
         return e.getText().toString().trim();
     }
 
-    private boolean save() {
-        Engine engine = Engine.get(this);
-        Settings s = engine.settings();
+    /** Impostazioni come sono ora nel modulo, anche se non ancora salvate. */
+    private Settings fromForm() {
+        Settings s = Engine.get(this).settings();
         s.dns = selected(dns, Settings.DNS);
         s.nextdnsId = text(nextdns);
         s.customDoh = text(doh);
@@ -174,6 +213,56 @@ public class SettingsActivity extends Activity {
         s.blockThirdPartyCookies = cookies.isChecked();
         s.javascript = js.isChecked();
         s.secureScreen = secure.isChecked();
+        return s;
+    }
+
+    private int dp(int v) {
+        return (int) (v * getResources().getDisplayMetrics().density);
+    }
+
+    private TextView line(String text, int sizeSp, int color, boolean medium) {
+        TextView t = new TextView(this);
+        t.setText(text);
+        t.setTextSize(sizeSp);
+        t.setTextColor(getColor(color));
+        if (medium) t.setTypeface(android.graphics.Typeface.create("sans-serif-medium", android.graphics.Typeface.NORMAL));
+        t.setPadding(0, dp(2), 0, dp(2));
+        return t;
+    }
+
+    private void updateReport() {
+        if (scoreValue == null) return;
+        PrivacyReport r = PrivacyReport.evaluate(fromForm());
+        int color = "Massima".equals(r.level) ? R.color.ok
+            : "Alta".equals(r.level) ? R.color.accent
+            : "Buona".equals(r.level) ? R.color.amber : R.color.warn;
+        scoreValue.setText(String.valueOf(r.score));
+        scoreValue.setTextColor(getColor(color));
+        scoreLevel.setText("La tua privacy: " + r.level.toLowerCase(java.util.Locale.ITALIAN));
+
+        observersBox.removeAllViews();
+        for (PrivacyReport.Observer o : r.observers) {
+            LinearLayout box = new LinearLayout(this);
+            box.setOrientation(LinearLayout.VERTICAL);
+            box.setBackgroundResource(R.drawable.bg_observer);
+            box.setPadding(dp(12), dp(10), dp(12), dp(10));
+            box.addView(line(o.who, 14, R.color.text, true));
+            for (String l : o.sees) box.addView(line("•  " + l, 13, R.color.text2, false));
+            LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+            lp.bottomMargin = dp(8);
+            observersBox.addView(box, lp);
+        }
+
+        tipsBox.removeAllViews();
+        for (PrivacyReport.Tip t : r.tips) tipsBox.addView(line("•  " + t.text + "  +" + t.gain, 13, R.color.text2, false));
+        tipsTitle.setVisibility(r.tips.isEmpty() ? View.GONE : View.VISIBLE);
+        vpnNote.setVisibility(r.vpnNote ? View.VISIBLE : View.GONE);
+    }
+
+    private boolean save() {
+        Engine engine = Engine.get(this);
+        Settings s = fromForm();
 
         Map<String, String> errors = s.validate();
         nextdns.setError(errors.get("nextdns"));

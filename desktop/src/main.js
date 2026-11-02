@@ -11,11 +11,18 @@ const {
 } = require('./settings');
 const { Privacy, inputToUrl } = require('./privacy');
 const pages = require('./pages');
+const report = require('./report');
 
 const PARTITION = 'angerona-private'; // senza "persist:" la sessione vive solo in memoria
 const HOME = 'angerona://start';
 const THEME = { strip: '#1C1846', bar: '#26215C', page: '#16132F', text: '#CECBF6' };
 const TABSTRIP_HEIGHT = 40;
+// Siti indipendenti per verificare la privacy della connessione.
+const PRIVACY_TESTS = {
+  mullvad: 'https://mullvad.net/it/check',
+  eff: 'https://coveryourtracks.eff.org/',
+  browserleaks: 'https://browserleaks.com/',
+};
 
 app.setName('Angerona');
 const settingsDir = app.getPath('userData');
@@ -496,6 +503,7 @@ function settingsPayload() {
     searchEngines: SEARCH_ENGINES.map(({ id, label }) => ({ id, label })),
     proxyModes: PROXY_MODES,
     filters: privacy.filtersInfo,
+    report: report.evaluate(store.value),
     version: app.getVersion(),
     engine: `Chromium ${process.versions.chrome}`,
   };
@@ -550,6 +558,11 @@ ipcMain.handle('settings:set', guard(async (input) => {
     if (t.view.webContents.getURL().startsWith(HOME)) t.view.webContents.reload();
   }
   return { ok: true, payload: settingsPayload(), jsChanged };
+}));
+ipcMain.handle('privacy:evaluate', guard((input) => report.evaluate(sanitize(input, store.value).settings)));
+ipcMain.handle('tab:open-test', guard((id) => {
+  const url = PRIVACY_TESTS[String(id)];
+  if (url) createTab(url);
 }));
 ipcMain.handle('net:check', guard(async () => {
   try {

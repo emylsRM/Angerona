@@ -37,7 +37,7 @@ final class Pages {
         + "button,.btn{background:#534AB7;color:#EEEDFE;border:0;font:inherit;padding:0 18px;text-decoration:none}"
         + ".chips{display:flex;flex-wrap:wrap;gap:8px;justify-content:center}"
         + ".chip{background:#26215C;border:1px solid #3C3489;border-radius:999px;padding:4px 12px;font-size:13px;color:#CECBF6}"
-        + ".chip b{font-weight:500;color:#EEEDFE}.warn{border-color:#993C1D}"
+        + ".chip b{font-weight:500;color:#EEEDFE}.warn{border-color:#993C1D}.score{border-color:#7F77DD}"
         + ".actions{margin-top:22px}.actions .btn{display:inline-block;padding:12px 20px;border-radius:12px}"
         + ".url{font-family:monospace;font-size:13px;color:#AFA9EC;word-break:break-all;margin-top:10px}";
 
@@ -84,6 +84,7 @@ final class Pages {
             + "<input name='" + esc(param) + "' placeholder='Cerca con " + esc(engine) + "' aria-label='Cerca' enterkeyhint='search'>"
             + "<button type='submit'>Cerca</button></form>"
             + "<div class='chips'>"
+            + "<span class='chip score'>Privacy <b>" + PrivacyReport.evaluate(s).score + "/100</b></span>"
             + "<span class='chip" + ("system".equals(s.dns) ? " warn" : "") + "'>DNS <b>" + esc(dns) + "</b></span>"
             + "<span class='chip'>Proxy <b>" + esc(proxy) + "</b></span>"
             + "<span class='chip'>Tracker <b>" + (s.blockTrackers ? "protezione rigorosa" : "protezione standard") + "</b></span>"

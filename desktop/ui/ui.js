@@ -232,8 +232,59 @@
     return `EasyList ed EasyPrivacy: ${f.rules.toLocaleString('it-IT')} regole, ${f.source}${when ? ` il ${when}` : ''}.`;
   }
 
+  // ---------- Pannello privacy ----------
+  function renderReport(r) {
+    if (!r) return;
+    const card = $('#privacy-card');
+    card.className = `card privacy lv-${r.level.toLowerCase()}`;
+    $('#score-ring').style.setProperty('--p', String(r.score));
+    $('#score-value').textContent = String(r.score);
+    $('#score-level').textContent = r.level.toLowerCase();
+    const mini = $('#score-mini');
+    mini.textContent = `Privacy ${r.score}/100 · ${r.level.toLowerCase()}`;
+    mini.className = `score-mini lv-${r.level.toLowerCase()}`;
+    const box = $('#observers');
+    box.textContent = '';
+    for (const o of r.observers) {
+      const div = document.createElement('div');
+      div.className = 'observer';
+      const h = document.createElement('h3');
+      h.textContent = o.who;
+      const ul = document.createElement('ul');
+      for (const line of o.sees) {
+        const li = document.createElement('li');
+        li.textContent = line;
+        ul.append(li);
+      }
+      div.append(h, ul);
+      box.append(div);
+    }
+    const tips = $('#tips');
+    tips.textContent = '';
+    for (const t of r.tips) {
+      const li = document.createElement('li');
+      li.textContent = t.text;
+      const gain = document.createElement('span');
+      gain.className = 'gain';
+      gain.textContent = `+${t.gain}`;
+      li.append(gain);
+      tips.append(li);
+    }
+    $('#tips-box').hidden = r.tips.length === 0;
+    $('#vpn-note').hidden = !r.vpnNote;
+  }
+
+  let reportTimer = null;
+  function refreshReport() {
+    clearTimeout(reportTimer);
+    reportTimer = setTimeout(async () => {
+      try { renderReport(await api.invoke('privacy:evaluate', collect())); } catch { /* il prossimo input riprova */ }
+    }, 120);
+  }
+
   function fillForm(p) {
     payload = p;
+    renderReport(p.report);
     const s = p.settings;
     fillSelect('dns', p.dnsProviders);
     fillSelect('proxyMode', p.proxyModes);
@@ -316,7 +367,7 @@
     panel.hidden = false;
     await api.invoke('ui:panel', true);
     panel.scrollTop = 0;
-    form.elements.dns.focus();
+    form.elements.dns.focus({ preventScroll: true });
   }
   function closePanel() {
     if (panel.hidden) return;
@@ -332,7 +383,11 @@
     $('#filters-info').textContent = filtersText(p.filters);
     renderToolbar();
   });
-  form.addEventListener('change', applyShowRules);
+  form.addEventListener('change', () => { applyShowRules(); refreshReport(); });
+  form.addEventListener('input', refreshReport);
+  for (const b of form.querySelectorAll('[data-test]')) {
+    b.addEventListener('click', () => { closePanel(); api.invoke('tab:open-test', b.dataset.test); });
+  }
   form.addEventListener('input', (e) => {
     const field = e.target.closest('.field');
     if (field && field.classList.contains('invalid')) {

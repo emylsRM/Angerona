@@ -6,6 +6,7 @@ Browser privato e leggero per **Windows** e **Android**, con il nome della dea r
 - **Proxy e VPN**: SOCKS5, HTTP o HTTPS. Se il proxy cade la navigazione si ferma invece di uscire senza protezione. Con una VPN attiva sul sistema non serve configurare nulla.
 - **Ricerca privata**: DuckDuckGo, Startpage, Brave Search, Mojeek, Qwant o la tua istanza SearXNG.
 - **Nessuna traccia**: tutte le schede sono private. Cookie, cache e cronologia restano solo in memoria e spariscono alla chiusura.
+- **Punteggio privacy**: nelle impostazioni un valore da 0 a 100 che cambia mentre modifichi le opzioni, con la spiegazione di cosa vedono i siti, il tuo operatore, il servizio DNS e il proxy. Da lì apri anche i test indipendenti (Mullvad, EFF Cover Your Tracks, BrowserLeaks).
 - **Protezioni**: blocco di tracker e pubblicità, cookie di terze parti bloccati, solo HTTPS, Global Privacy Control, nessun permesso a fotocamera, microfono, posizione e notifiche.
 
 | | Windows | Android |
