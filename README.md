@@ -32,7 +32,7 @@ Scorciatoie: `Ctrl+T` nuova scheda · `Ctrl+W` chiudi · `Ctrl+L` barra indirizz
 L'APK si compila gratis su GitHub (servono solo un account e pochi minuti):
 
 1. Crea un repository **privato** su github.com e carica tutto il contenuto di questa cartella (dal computer: «Add file → Upload files», trascinando le cartelle).
-2. Apri la scheda **Actions**, scegli **Compila Angerona** e premi **Run workflow**.
+2. Il caricamento dal browser salta la cartella nascosta `.github`: nella scheda **Actions** clicca **set up a workflow yourself**, incolla il contenuto di `.github/workflows/build.yml` e fai **Commit changes**. La compilazione parte da sola; in seguito puoi rilanciarla con **Run workflow**.
 3. Dopo circa 10 minuti, nella pagina dell'esecuzione trovi l'artefatto **Angerona-Android**: dentro c'è un APK per tipo di processore. Per quasi tutti i telefoni recenti va bene **arm64-v8a**.
 4. Installa l'APK sul telefono (Android ti chiederà di consentire l'installazione da questa fonte).
 
@@ -56,6 +56,12 @@ Poi, nel repository GitHub, **Settings → Secrets and variables → Actions**, 
 Conserva `angerona.jks` e le password in un posto sicuro: senza di essi non potrai più aggiornare l'app installata.
 
 ---
+
+## Manutenzione e richieste
+
+Ogni lunedì mattina un agente controlla aggiornamenti di sicurezza dei motori (Electron e GeckoView), liste anti-tracker, bug e compilazioni fallite. Le modifiche arrivano come **pull request**: GitHub le compila e tu le approvi con **Merge pull request**.
+
+Per chiedere una modifica o una nuova funzione apri una **issue** (scheda Issues → New issue) e descrivila con parole semplici: verrà realizzata al giro successivo in una pull request.
 
 ## Proxy e VPN: esempi
 
