@@ -4,7 +4,7 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 const {
-  app, BrowserWindow, WebContentsView, ipcMain, Menu, clipboard, session, protocol, dialog,
+  app, BrowserWindow, WebContentsView, ipcMain, Menu, clipboard, session, protocol,
 } = require('electron');
 const {
   SettingsStore, sanitize, searchUrl, DNS_PROVIDERS, SEARCH_ENGINES, PROXY_MODES,
@@ -622,27 +622,14 @@ async function clearEverything() {
 }
 
 let burning = false;
-/** Pulsante "brucia tutto": riepilogo dei tracker bloccati, poi cancella e chiude oppure continua. */
+/** Pulsante "brucia tutto": senza domande chiude tutte le schede, cancella tutto e riparte da zero. */
 async function burn() {
   if (!win || burning) return;
   burning = true;
   try {
     const n = sessionBlocked;
-    const { response } = await dialog.showMessageBox(win, {
-      type: 'question',
-      title: 'Cancella tutto',
-      message: n === 1 ? 'In questa sessione Angerona ha bloccato 1 tracker.'
-        : `In questa sessione Angerona ha bloccato ${n.toLocaleString('it-IT')} tracker.`,
-      detail: 'Si chiudono tutte le schede e si cancellano cookie, cache, accessi e dati dei siti.',
-      buttons: ['Cancella e chiudi', 'Cancella e continua', 'Annulla'],
-      defaultId: 0,
-      cancelId: 2,
-      noLink: true,
-    });
-    if (response === 2) return;
     await clearEverything();
-    if (response === 0) app.quit();
-    else sendUi('toast', 'Tutto cancellato: si riparte da zero');
+    sendUi('toast', `Tracce cancellate · ${n === 1 ? '1 tracker bloccato' : `${n.toLocaleString('it-IT')} tracker bloccati`} in sessione`);
   } finally {
     burning = false;
   }

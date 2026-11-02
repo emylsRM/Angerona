@@ -199,7 +199,7 @@ public class MainActivity extends Activity {
             Toast.makeText(this, msg, Toast.LENGTH_SHORT).show();
         });
         findViewById(R.id.tabs_button).setOnClickListener(v -> showTabs());
-        burn.setOnClickListener(v -> showBurn());
+        burn.setOnClickListener(v -> burnNow());
         findViewById(R.id.menu).setOnClickListener(this::showMenu);
     }
 
@@ -634,7 +634,7 @@ public class MainActivity extends Activity {
                 case M_FIND: openFind(); return true;
                 case M_CHECK: showPrivacyTests(); return true;
                 case M_SETTINGS: startActivityForResult(new Intent(this, SettingsActivity.class), REQUEST_SETTINGS); return true;
-                case M_CLEAR_EXIT: clearAll(true); return true;
+                case M_CLEAR_EXIT: clearAll(true, null); return true;
                 default: return false;
             }
         });
@@ -656,22 +656,16 @@ public class MainActivity extends Activity {
         return false;
     }
 
-    /** Pulsante "brucia tutto": riepilogo dei tracker bloccati, poi cancella e chiude oppure continua. */
-    private void showBurn() {
+    /** Pulsante "brucia tutto": senza domande chiude tutte le schede, cancella tutto e riparte da zero. */
+    private void burnNow() {
         if (!ready) return;
-        String count = sessionBlocked == 1 ? "1 tracker" : String.format(Locale.ITALIAN, "%,d tracker", sessionBlocked);
-        new AlertDialog.Builder(this)
-            .setTitle("Cancella tutto")
-            .setMessage("In questa sessione Angerona ha bloccato " + count + ".\n\n"
-                + "Si chiudono tutte le schede e si cancellano cookie, cache, accessi e dati dei siti.")
-            .setPositiveButton("Cancella e chiudi", (d, w) -> clearAll(true))
-            .setNeutralButton("Cancella e continua", (d, w) -> clearAll(false))
-            .setNegativeButton("Annulla", null)
-            .show();
+        int n = sessionBlocked;
+        String count = n == 1 ? "1 tracker bloccato" : String.format(Locale.ITALIAN, "%,d tracker bloccati", n);
+        clearAll(false, "Tracce cancellate · " + count + " in sessione");
     }
 
     /** Chiude tutte le schede e cancella cookie, cache e dati dei siti. */
-    private void clearAll(boolean exit) {
+    private void clearAll(boolean exit, String message) {
         sessionBlocked = 0;
         if (geckoView.getSession() != null) geckoView.releaseSession();
         for (Tab t : tabs) t.session.close();
@@ -682,7 +676,7 @@ public class MainActivity extends Activity {
                 finishAndRemoveTask();
             } else {
                 newTab(null, true, true);
-                Toast.makeText(this, "Dati di navigazione cancellati", Toast.LENGTH_SHORT).show();
+                Toast.makeText(this, message != null ? message : "Dati di navigazione cancellati", Toast.LENGTH_SHORT).show();
             }
         }, e -> {
             if (exit) finishAndRemoveTask(); else newTab(null, true, true);
@@ -812,7 +806,7 @@ public class MainActivity extends Activity {
             } else if ("update".equals(action)) {
                 updater.check(true);
             } else if ("clear".equals(action)) {
-                clearAll(false);
+                clearAll(false, "Dati di navigazione cancellati");
             } else if (resultCode == RESULT_OK) {
                 // Aggiorna le pagine iniziali aperte con le nuove impostazioni.
                 for (Tab t : tabs) if (t.internal() && t.errorUrl == null) loadStart(t);
