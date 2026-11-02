@@ -166,6 +166,16 @@ final class Pages {
             + "<p class='sub'>Chiudi e riapri Angerona. Se succede ancora, imposta il proxy su «Nessuno».</p>");
     }
 
+    static String crashLoop(String uri) {
+        boolean web = uri != null && (uri.startsWith("https://") || uri.startsWith("http://"));
+        return page("La pagina si blocca",
+            icon(60)
+            + "<h1>La pagina continua a bloccarsi</h1>"
+            + "<p>Angerona ha smesso di ricaricarla per non andare avanti all'infinito.</p>"
+            + "<p class='sub'>Se hai acceso la modalità blindata, prova a spegnerla nelle impostazioni e usa «Cancella tutto ed esci».</p>"
+            + (web ? "<div class='url'>" + esc(uri) + "</div><div class='actions'><a class='btn' href='" + esc(uri) + "'>Riprova</a></div>" : ""));
+    }
+
     static String dataUri(String html) {
         return "data:text/html;charset=utf-8;base64,"
             + Base64.encodeToString(html.getBytes(StandardCharsets.UTF_8), Base64.NO_WRAP);

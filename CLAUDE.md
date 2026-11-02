@@ -23,6 +23,8 @@ Browser privato dell'utente per Windows (`desktop/`, Electron) e Android (`andro
 
 ## Android (GeckoView)
 - Versione motore in `android/gradle.properties` (`geckoviewVersion=NNN.+`). AGP, Gradle e compileSdk vanno allineati a quelli del branch `release` di mozilla-firefox/firefox (GeckoView 159 richiede compileSdk 37.2).
+- Preferenze di Firefox impostate da `Engine.hardeningPrefs` con `GeckoPreferenceController` (ramo utente, riapplicate a ogni avvio e salvataggio). La modalità blindata spegne i JIT subito; i processi isolati (`isolatedProcessEnabled`) cambiano solo a processo nuovo: «Cancella tutto ed esci» termina il processo apposta.
+- Blocco con impronta/PIN (`AppLock`, BiometricPrompt di sistema) e cancellazione automatica sono gestiti in `MainActivity` contando le attività avviate: l'app «esce» quando nessuna è visibile; le app esterne aperte per un risultato (scelta file, PIN) non contano.
 - Proxy tramite estensione interna `app/src/main/assets/extensions/proxy`: blocca tutto finché l'app non invia la configurazione; `Engine.canBrowse()` ferma i caricamenti se il proxy non è confermato.
 - Gli stili `Angerona.*` ereditano dallo stile base `Angerona` in `themes.xml`: non rimuoverlo.
 - La compilazione vera avviene su GitHub Actions (`.github/workflows/main.yml`); in ambienti senza accesso a Maven Google/Mozilla controlla almeno i tipi con `android.jar` e stub generati da `mobile/android/geckoview/api.txt`.

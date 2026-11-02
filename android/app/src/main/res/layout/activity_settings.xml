@@ -258,10 +258,29 @@
                 <TextView style="@style/Angerona.Help" android:text="Impedisce screenshot e anteprime nelle app recenti." />
             </LinearLayout>
 
+            <!-- Sicurezza avanzata -->
+            <LinearLayout style="@style/Angerona.Section">
+                <TextView style="@style/Angerona.SectionTitle" android:text="Sicurezza avanzata" />
+                <TextView style="@style/Angerona.Help" android:text="Protezioni in più che hanno un prezzo: accendile se ti servono." />
+                <Switch android:id="@+id/switch_hardened" style="@style/Angerona.Switch" android:text="Modalità blindata" />
+                <TextView style="@style/Angerona.Help" android:text="Spegne il compilatore veloce di JavaScript, da cui passa la maggior parte degli attacchi ai browser, e chiude le pagine in una gabbia in più di Android. I siti pesanti sono più lenti e alcuni giochi o editor online non funzionano. La gabbia si attiva dopo «Cancella tutto ed esci»." />
+                <Switch android:id="@+id/switch_lock" style="@style/Angerona.Switch" android:text="Blocca con impronta o PIN" />
+                <TextView style="@style/Angerona.Help" android:text="Quando torni su Angerona servono l'impronta, il volto o il PIN del telefono. Nelle app recenti non si vede il contenuto delle schede." />
+            </LinearLayout>
+
             <!-- Dati -->
             <LinearLayout style="@style/Angerona.Section">
                 <TextView style="@style/Angerona.SectionTitle" android:text="Dati di navigazione" />
                 <TextView style="@style/Angerona.Help" android:text="Tutte le schede sono private: cookie, cache e cronologia spariscono quando le chiudi o esci." />
+                <TextView style="@style/Angerona.Label" android:text="Cancellazione automatica" />
+                <Spinner
+                    android:id="@+id/spinner_autoclear"
+                    android:layout_width="match_parent"
+                    android:layout_height="48dp"
+                    android:layout_marginTop="4dp"
+                    android:background="@drawable/bg_input"
+                    android:popupBackground="@drawable/bg_popup" />
+                <TextView style="@style/Angerona.Help" android:layout_marginTop="6dp" android:text="Il tempo parte quando esci da Angerona o spegni lo schermo: poi tutte le schede si chiudono e i dati vengono cancellati." />
                 <Button
                     android:id="@+id/btn_clear"
                     style="@style/Angerona.Button"

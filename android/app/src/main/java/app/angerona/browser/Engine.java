@@ -8,6 +8,8 @@ import android.util.Log;
 import org.json.JSONException;
 import org.json.JSONObject;
 import org.mozilla.geckoview.ContentBlocking;
+import org.mozilla.geckoview.GeckoPreferenceController;
+import org.mozilla.geckoview.GeckoPreferenceController.SetGeckoPreference;
 import org.mozilla.geckoview.GeckoRuntime;
 import org.mozilla.geckoview.GeckoRuntimeSettings;
 import org.mozilla.geckoview.GeckoSession;
@@ -37,6 +39,8 @@ public final class Engine {
     private WebExtension.Port port;
     private boolean proxyApplied;
     private boolean extensionFailed;
+    /** Il motore è partito con i processi isolati? (Cambia solo riavviando l'app.) */
+    private final boolean startedHardened;
     private final List<Consumer<Boolean>> waiters = new ArrayList<>();
     private final List<Runnable> lateListeners = new ArrayList<>();
     private final Handler main = new Handler(Looper.getMainLooper());
@@ -48,6 +52,7 @@ public final class Engine {
 
     private Engine(Context ctx) {
         settings = Settings.load(ctx);
+        startedHardened = settings.hardened;
         GeckoRuntimeSettings.Builder b = new GeckoRuntimeSettings.Builder()
             .contentBlocking(contentBlocking(settings))
             .allowInsecureConnections(settings.httpsOnly ? GeckoRuntimeSettings.HTTPS_ONLY : GeckoRuntimeSettings.ALLOW_ALL)
@@ -57,7 +62,16 @@ public final class Engine {
             .aboutConfigEnabled(false)
             .remoteDebuggingEnabled(false)
             .consoleOutput(false)
-            .preferredColorScheme(GeckoRuntimeSettings.COLOR_SCHEME_SYSTEM);
+            .preferredColorScheme(GeckoRuntimeSettings.COLOR_SCHEME_SYSTEM)
+            // Ogni sito in un processo separato (già predefinito da Firefox 147, qui reso esplicito).
+            .fissionEnabled(true)
+            // Le pagine su Internet non possono contattare la rete di casa né le app sul telefono.
+            .setLnaEnabled(true)
+            .setLnaBlocking(true)
+            .setLnaBlockTrackers(true)
+            // Modalità blindata: le pagine girano in processi isolati di Android (senza permessi,
+            // utente separato), come le schede di Chrome. Vale dall'avvio successivo dell'app.
+            .isolatedProcessEnabled(settings.hardened);
         String doh = settings.dohUrl();
         if (doh != null) {
             b.trustedRecursiveResolverUri(doh).trustedRecursiveResolverMode(GeckoRuntimeSettings.TRR_MODE_ONLY);
@@ -69,7 +83,61 @@ public final class Engine {
         runtime.getSettings().setFingerprintingProtectionPrivateBrowsing(true);
         runtime.getSettings().setFingerprintingProtectionOverrides(fingerprintOverrides(settings));
         runtime.getSettings().setLocales(locales(settings));
+        applyPrefs(settings);
         installProxyExtension();
+    }
+
+    // ---------- Preferenze del motore ----------
+
+    /**
+     * Difese di Firefox spente per impostazione predefinita, accese qui. Nessuna cambia l'aspetto dei
+     * siti: riguardano richieste in chiaro, collegamenti anticipati, certificati e indirizzi truccati.
+     */
+    private static List<SetGeckoPreference<?>> hardeningPrefs(Settings s) {
+        int user = GeckoPreferenceController.PREF_BRANCH_USER;
+        List<SetGeckoPreference<?>> p = new ArrayList<>();
+        // Indirizzi con lettere straniere che imitano siti noti (es. «а» cirillica) mostrati come xn--…
+        p.add(SetGeckoPreference.setBoolPref("network.IDN_show_punycode", true, user));
+        // Con «Solo HTTPS» Firefox manda comunque una richiesta di prova non cifrata: spenta.
+        p.add(SetGeckoPreference.setBoolPref("dom.security.https_only_mode_send_http_background_request", false, user));
+        // Nessun collegamento anticipato a link e indirizzi che non hai aperto.
+        p.add(SetGeckoPreference.setBoolPref("network.prefetch-next", false, user));
+        p.add(SetGeckoPreference.setBoolPref("network.dns.disablePrefetch", true, user));
+        p.add(SetGeckoPreference.setBoolPref("network.dns.disablePrefetchFromHTTPS", true, user));
+        p.add(SetGeckoPreference.setBoolPref("network.predictor.enabled", false, user));
+        p.add(SetGeckoPreference.setIntPref("network.http.speculative-parallel-limit", 0, user));
+        p.add(SetGeckoPreference.setBoolPref("browser.send_pings", false, user));
+        // Scambio di chiavi post-quantistico (ML-KEM): il traffico registrato oggi resta indecifrabile domani.
+        p.add(SetGeckoPreference.setBoolPref("security.tls.enable_kyber", true, user));
+        p.add(SetGeckoPreference.setBoolPref("network.http.http3.enable_kyber", true, user));
+        // Solo le autorità di certificazione di Firefox, con il blocco dei certificati sempre rigoroso.
+        p.add(SetGeckoPreference.setBoolPref("security.enterprise_roots.enabled", false, user));
+        p.add(SetGeckoPreference.setIntPref("security.cert_pinning.enforcement_level", 2, user));
+        // I PDF non eseguono script.
+        p.add(SetGeckoPreference.setBoolPref("pdfjs.enableScripting", false, user));
+        // Modalità blindata: niente compilatori JIT, come il livello «Più sicuro» di Tor Browser.
+        boolean jit = !s.hardened;
+        p.add(SetGeckoPreference.setBoolPref("javascript.options.ion", jit, user));
+        p.add(SetGeckoPreference.setBoolPref("javascript.options.baselinejit", jit, user));
+        p.add(SetGeckoPreference.setBoolPref("javascript.options.native_regexp", jit, user));
+        p.add(SetGeckoPreference.setBoolPref("javascript.options.asmjs", jit, user));
+        p.add(SetGeckoPreference.setBoolPref("javascript.options.wasm", jit, user));
+        return p;
+    }
+
+    private void applyPrefs(Settings s) {
+        try {
+            GeckoPreferenceController.setGeckoPrefs(hardeningPrefs(s)).accept(
+                result -> {
+                    if (result == null) return;
+                    for (java.util.Map.Entry<String, Boolean> e : result.entrySet()) {
+                        if (!Boolean.TRUE.equals(e.getValue())) Log.w(TAG, "Preferenza non applicata: " + e.getKey());
+                    }
+                },
+                e -> Log.e(TAG, "Preferenze del motore non applicate", e));
+        } catch (RuntimeException e) {
+            Log.e(TAG, "Preferenze del motore non disponibili", e);
+        }
     }
 
     public Settings settings() {
@@ -127,6 +195,9 @@ public final class Engine {
             .cookieBehaviorPrivateMode(cookies)
             .queryParameterStrippingEnabled(true)
             .queryParameterStrippingPrivateBrowsingEnabled(true)
+            // Siti che fanno da ponte solo per tracciarti e pixel spia nelle email.
+            .bounceTrackingProtectionMode(ContentBlocking.BounceTrackingProtectionMode.BOUNCE_TRACKING_PROTECTION_MODE_ENABLED)
+            .emailTrackerBlockingPrivateMode(true)
             .build();
     }
 
@@ -152,7 +223,13 @@ public final class Engine {
         cb.setStrictSocialTrackingProtection(s.blockTrackers);
         cb.setCookieBehavior(cookies);
         cb.setCookieBehaviorPrivateMode(cookies);
+        applyPrefs(s);
         sendProxyConfig();
+    }
+
+    /** La modalità blindata è cambiata rispetto all'avvio: i processi isolati seguono al prossimo avvio. */
+    public boolean restartNeededFor(Settings s) {
+        return s.hardened != startedHardened;
     }
 
     // ---------- Proxy tramite estensione interna ----------

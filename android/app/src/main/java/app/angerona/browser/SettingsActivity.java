@@ -41,6 +41,9 @@ public class SettingsActivity extends Activity {
     private Switch js;
     private Switch secure;
     private Switch updates;
+    private Switch hardened;
+    private Switch lock;
+    private Spinner autoClear;
     private TextView scoreValue;
     private TextView scoreLevel;
     private TextView tipsTitle;
@@ -83,6 +86,9 @@ public class SettingsActivity extends Activity {
         js = findViewById(R.id.switch_js);
         secure = findViewById(R.id.switch_secure);
         updates = findViewById(R.id.switch_updates);
+        hardened = findViewById(R.id.switch_hardened);
+        lock = findViewById(R.id.switch_lock);
+        autoClear = findViewById(R.id.spinner_autoclear);
         scoreValue = findViewById(R.id.score_value);
         scoreLevel = findViewById(R.id.score_level);
         tipsTitle = findViewById(R.id.tips_title);
@@ -94,6 +100,7 @@ public class SettingsActivity extends Activity {
         proxy.setAdapter(adapter(Settings.labels(Settings.PROXY)));
         search.setAdapter(adapter(Settings.labels(Settings.SEARCH)));
         fingerprint.setAdapter(adapter(Settings.labels(Settings.FINGERPRINT)));
+        autoClear.setAdapter(adapter(Settings.labels(Settings.AUTO_CLEAR)));
 
         Settings s = Engine.get(this).settings();
         dns.setSelection(Settings.indexOf(Settings.DNS, s.dns));
@@ -114,6 +121,15 @@ public class SettingsActivity extends Activity {
         js.setChecked(s.javascript);
         secure.setChecked(s.secureScreen);
         updates.setChecked(s.checkUpdates);
+        hardened.setChecked(s.hardened);
+        lock.setChecked(s.appLock && AppLock.available(this));
+        autoClear.setSelection(Settings.indexOf(Settings.AUTO_CLEAR, String.valueOf(s.autoClear)));
+        lock.setOnCheckedChangeListener((b, checked) -> {
+            if (checked && !AppLock.available(this)) {
+                b.setChecked(false);
+                Toast.makeText(this, "Prima imposta un blocco schermo (PIN, sequenza o impronta) nelle impostazioni del telefono", Toast.LENGTH_LONG).show();
+            }
+        });
 
         AdapterView.OnItemSelectedListener refresh = new AdapterView.OnItemSelectedListener() {
             @Override public void onItemSelected(AdapterView<?> parent, View view, int position, long id) { updateVisibility(); updateReport(); }
@@ -123,7 +139,7 @@ public class SettingsActivity extends Activity {
         proxy.setOnItemSelectedListener(refresh);
         search.setOnItemSelectedListener(refresh);
         fingerprint.setOnItemSelectedListener(refresh);
-        for (Switch sw : new Switch[] {https, trackers, cookies, js, webrtc}) {
+        for (Switch sw : new Switch[] {https, trackers, cookies, js, webrtc, hardened}) {
             sw.setOnCheckedChangeListener((b, checked) -> updateReport());
         }
         host.addTextChangedListener(new TextWatcher() {
@@ -184,8 +200,18 @@ public class SettingsActivity extends Activity {
     @Override
     protected void onResume() {
         super.onResume();
-        if (Engine.get(this).settings().secureScreen) getWindow().addFlags(WindowManager.LayoutParams.FLAG_SECURE);
+        Settings s = Engine.get(this).settings();
+        if (s.secureScreen) getWindow().addFlags(WindowManager.LayoutParams.FLAG_SECURE);
         else getWindow().clearFlags(WindowManager.LayoutParams.FLAG_SECURE);
+        if (Build.VERSION.SDK_INT >= 33) setRecentsScreenshotEnabled(!s.appLock);
+    }
+
+    @Override
+    protected void onStop() {
+        super.onStop();
+        // Con il blocco attivo, uscendo dall'app le impostazioni (password del proxy comprese) si chiudono:
+        // al ritorno si passa dalla schermata di sblocco.
+        if (Engine.get(this).settings().appLock && !isChangingConfigurations() && !isFinishing()) finish();
     }
 
     private ArrayAdapter<String> adapter(String[] items) {
@@ -233,6 +259,9 @@ public class SettingsActivity extends Activity {
         s.checkUpdates = updates.isChecked();
         s.fingerprint = selected(fingerprint, Settings.FINGERPRINT);
         s.webrtc = webrtc.isChecked();
+        s.hardened = hardened.isChecked();
+        s.appLock = lock.isChecked();
+        s.autoClear = Integer.parseInt(selected(autoClear, Settings.AUTO_CLEAR));
         return s;
     }
 
@@ -296,7 +325,9 @@ public class SettingsActivity extends Activity {
         }
         s.save(this);
         engine.apply(s);
-        Toast.makeText(this, "Impostazioni applicate", Toast.LENGTH_SHORT).show();
+        Toast.makeText(this, engine.restartNeededFor(s)
+            ? "Impostazioni applicate. La gabbia della modalità blindata cambia dopo «Cancella tutto ed esci»."
+            : "Impostazioni applicate", engine.restartNeededFor(s) ? Toast.LENGTH_LONG : Toast.LENGTH_SHORT).show();
         return true;
     }
 }

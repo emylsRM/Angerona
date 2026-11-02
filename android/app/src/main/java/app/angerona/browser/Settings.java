@@ -51,6 +51,14 @@ public final class Settings {
         {"massima", "Massima — come Tor: ora UTC e siti in inglese"},
     };
 
+    /** Minuti in background dopo i quali tutto viene cancellato ("0" = mai). */
+    public static final String[][] AUTO_CLEAR = {
+        {"0", "Mai"},
+        {"5", "Dopo 5 minuti senza usare Angerona"},
+        {"15", "Dopo 15 minuti senza usare Angerona"},
+        {"30", "Dopo 30 minuti senza usare Angerona"},
+    };
+
     public static final String[][] PROXY = {
         {"none", "Nessuno (diretto o app VPN)"},
         {"socks5", "SOCKS5"},
@@ -76,6 +84,9 @@ public final class Settings {
     public boolean checkUpdates = true;
     public String fingerprint = "rafforzata";
     public boolean webrtc = false;
+    public boolean hardened = false;
+    public int autoClear = 0;
+    public boolean appLock = false;
 
     private static final String PREFS = "angerona";
     private static final String KEY_ALIAS = "angerona-proxy";
@@ -92,6 +103,9 @@ public final class Settings {
         s.checkUpdates = checkUpdates;
         s.fingerprint = fingerprint;
         s.webrtc = webrtc;
+        s.hardened = hardened;
+        s.autoClear = autoClear;
+        s.appLock = appLock;
         return s;
     }
 
@@ -207,6 +221,10 @@ public final class Settings {
         s.checkUpdates = p.getBoolean("checkUpdates", s.checkUpdates);
         s.fingerprint = p.getString("fingerprint", s.fingerprint);
         s.webrtc = p.getBoolean("webrtc", s.webrtc);
+        s.hardened = p.getBoolean("hardened", s.hardened);
+        s.autoClear = p.getInt("autoClear", s.autoClear);
+        s.appLock = p.getBoolean("appLock", s.appLock);
+        if (!String.valueOf(s.autoClear).equals(AUTO_CLEAR[indexOf(AUTO_CLEAR, String.valueOf(s.autoClear))][0])) s.autoClear = 0;
         // Valori sconosciuti (versioni future o file alterati) tornano ai predefiniti.
         if (!s.dns.equals(DNS[indexOf(DNS, s.dns)][0])) s.dns = "quad9";
         if (!s.search.equals(SEARCH[indexOf(SEARCH, s.search)][0])) s.search = "duckduckgo";
@@ -239,6 +257,9 @@ public final class Settings {
             .putBoolean("checkUpdates", checkUpdates)
             .putString("fingerprint", fingerprint)
             .putBoolean("webrtc", webrtc)
+            .putBoolean("hardened", hardened)
+            .putInt("autoClear", autoClear)
+            .putBoolean("appLock", appLock)
             .commit();
     }
 
