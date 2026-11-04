@@ -42,6 +42,7 @@ public class SettingsActivity extends Activity {
     private Switch secure;
     private Switch updates;
     private Switch hardened;
+    private Switch adblock;
     private Switch lock;
     private Spinner autoClear;
     private TextView scoreValue;
@@ -87,6 +88,7 @@ public class SettingsActivity extends Activity {
         secure = findViewById(R.id.switch_secure);
         updates = findViewById(R.id.switch_updates);
         hardened = findViewById(R.id.switch_hardened);
+        adblock = findViewById(R.id.switch_adblock);
         lock = findViewById(R.id.switch_lock);
         autoClear = findViewById(R.id.spinner_autoclear);
         scoreValue = findViewById(R.id.score_value);
@@ -122,6 +124,14 @@ public class SettingsActivity extends Activity {
         secure.setChecked(s.secureScreen);
         updates.setChecked(s.checkUpdates);
         hardened.setChecked(s.hardened);
+        adblock.setChecked(s.adblock);
+        ((TextView) findViewById(R.id.adblock_status)).setText("Stato: " + Engine.get(this).adblock.status());
+        findViewById(R.id.btn_adblock).setOnClickListener(v -> {
+            if (save()) {
+                setResult(RESULT_OK, new Intent().putExtra(MainActivity.EXTRA_ACTION, "adblock"));
+                finish();
+            }
+        });
         lock.setChecked(s.appLock && AppLock.available(this));
         autoClear.setSelection(Settings.indexOf(Settings.AUTO_CLEAR, String.valueOf(s.autoClear)));
         lock.setOnCheckedChangeListener((b, checked) -> {
@@ -139,7 +149,7 @@ public class SettingsActivity extends Activity {
         proxy.setOnItemSelectedListener(refresh);
         search.setOnItemSelectedListener(refresh);
         fingerprint.setOnItemSelectedListener(refresh);
-        for (Switch sw : new Switch[] {https, trackers, cookies, js, webrtc, hardened}) {
+        for (Switch sw : new Switch[] {https, trackers, cookies, js, webrtc, hardened, adblock}) {
             sw.setOnCheckedChangeListener((b, checked) -> updateReport());
         }
         host.addTextChangedListener(new TextWatcher() {
@@ -260,6 +270,7 @@ public class SettingsActivity extends Activity {
         s.fingerprint = selected(fingerprint, Settings.FINGERPRINT);
         s.webrtc = webrtc.isChecked();
         s.hardened = hardened.isChecked();
+        s.adblock = adblock.isChecked();
         s.appLock = lock.isChecked();
         s.autoClear = Integer.parseInt(selected(autoClear, Settings.AUTO_CLEAR));
         return s;
@@ -304,7 +315,7 @@ public class SettingsActivity extends Activity {
         }
 
         tipsBox.removeAllViews();
-        for (PrivacyReport.Tip t : r.tips) tipsBox.addView(line("•  " + t.text + "  +" + t.gain, 13, R.color.text2, false));
+        for (PrivacyReport.Tip t : r.tips) tipsBox.addView(line("•  " + t.text + (t.gain > 0 ? "  +" + t.gain : ""), 13, R.color.text2, false));
         tipsTitle.setVisibility(r.tips.isEmpty() ? View.GONE : View.VISIBLE);
         vpnNote.setVisibility(r.vpnNote ? View.VISIBLE : View.GONE);
     }

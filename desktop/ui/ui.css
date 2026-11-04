@@ -211,3 +211,5 @@ h2 { font-size: 15px; font-weight: 500; margin: 0 0 6px; }
 .net-bad { color: var(--warn); }
 
 @media (prefers-reduced-motion: reduce) { * { transition: none !important; animation-duration: 0s !important; } }
+.shields-off { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin: 2px 0 10px; }
+.shields-off #shields-off-list { color: var(--text-2); }

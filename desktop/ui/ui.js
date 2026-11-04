@@ -129,11 +129,13 @@
     zoom.textContent = `${active.zoom}%`;
 
     const shield = $('#shield');
-    const off = payload && !payload.settings.blockTrackers;
+    const globalOff = payload && !payload.settings.blockTrackers;
+    const off = globalOff || active.shields === false;
     shield.className = `shield${off ? ' off' : active.blocked ? ' active' : ''}`;
     shield.innerHTML = svg(off ? 'shield' : 'shieldCheck', 16) + (active.blocked && !off ? `<span>${active.blocked}</span>` : '');
-    shield.title = off ? 'Blocco tracker disattivato'
-      : active.blocked === 1 ? '1 tracker bloccato in questa pagina' : `${active.blocked} tracker bloccati in questa pagina`;
+    shield.title = globalOff ? 'Blocco di pubblicità e tracker spento'
+      : off ? 'Protezioni spente su questo sito: clicca per riattivarle'
+        : `${active.blocked === 1 ? '1 elemento bloccato' : `${active.blocked} elementi bloccati`} in questa pagina: clicca per le protezioni del sito`;
 
     document.title = active.title ? `${active.title} — Angerona` : 'Angerona';
   }
@@ -155,6 +157,11 @@
   renderBurn(0);
   api.on('session', (s) => renderBurn(Number(s && s.blocked) || 0));
   $('#burn').addEventListener('click', () => { closePanel(); api.invoke('data:burn'); });
+  // Lo scudo apre il menu delle protezioni del sito (come lo scudo di Brave).
+  $('#shield').addEventListener('click', (e) => {
+    const r = e.currentTarget.getBoundingClientRect();
+    api.invoke('shields:menu', { x: r.left, y: r.bottom + 4 });
+  });
 
   $('#new-tab').addEventListener('click', () => { closePanel(); api.invoke('tab:new'); focusAddress(); });
   $('#back').addEventListener('click', () => api.invoke('tab:back'));
@@ -221,7 +228,7 @@
   const form = $('#settings-form');
   const CHECKBOXES = [
     'httpsOnly', 'blockTrackers', 'blockThreats', 'blockThirdPartyCookies', 'reduceFingerprint', 'javascript',
-    'checkUpdates', 'hardened', 'strictCerts',
+    'checkUpdates', 'hardened', 'strictCerts', 'blockCookieBanners',
   ];
   let savedSnapshot = '';
 
@@ -243,9 +250,9 @@
   }
 
   function filtersText(f) {
-    if (!f || !f.rules) return 'Liste EasyList ed EasyPrivacy: in attesa del primo aggiornamento.';
+    if (!f || !f.rules) return 'Liste in attesa del primo aggiornamento.';
     const when = f.updated ? new Date(f.updated).toLocaleDateString('it-IT', { day: 'numeric', month: 'long', year: 'numeric' }) : '';
-    return `EasyList ed EasyPrivacy: ${f.rules.toLocaleString('it-IT')} regole, ${f.source}${when ? ` il ${when}` : ''}.`;
+    return `${f.rules.toLocaleString('it-IT')} regole, ${f.source}${when ? ` il ${when}` : ''}. Si aggiornano da sole ogni 2 giorni.`;
   }
 
   function threatsText(f) {
@@ -325,6 +332,8 @@
     el.searxngUrl.value = s.searxngUrl;
     for (const k of CHECKBOXES) el[k].checked = s[k];
     el.autoClear.value = String(s.autoClear);
+    shieldsOff = Array.isArray(s.shieldsOff) ? s.shieldsOff.slice() : [];
+    renderShieldsOff();
     $('#filters-info').textContent = filtersText(p.filters);
     $('#threats-info').textContent = threatsText(p.threats);
     $('#about').textContent = `Angerona ${p.version} · ${p.engine}`;
@@ -358,8 +367,22 @@
       strictCerts: el.strictCerts.checked,
       hardened: el.hardened.checked,
       autoClear: Number(el.autoClear.value),
+      blockCookieBanners: el.blockCookieBanners.checked,
+      shieldsOff: shieldsOff.slice(),
     };
   }
+
+  // Siti con le protezioni spente (dal pulsante con lo scudo): si possono riattivare da qui.
+  let shieldsOff = [];
+  function renderShieldsOff() {
+    $('#shields-off').hidden = shieldsOff.length === 0;
+    $('#shields-off-list').textContent = shieldsOff.join(', ');
+  }
+  $('#shields-on-all').addEventListener('click', () => {
+    shieldsOff = [];
+    renderShieldsOff();
+    refreshReport();
+  });
 
   function clearErrors() {
     for (const em of form.querySelectorAll('[data-error]')) {

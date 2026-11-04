@@ -35,6 +35,8 @@ public final class Engine {
     private static Engine instance;
 
     public final GeckoRuntime runtime;
+    /** uBlock Origin: blocco di pubblicità, tracker e pop-up come in Brave. */
+    public final Adblock adblock;
     private Settings settings;
     private WebExtension.Port port;
     private boolean proxyApplied;
@@ -84,6 +86,7 @@ public final class Engine {
         runtime.getSettings().setFingerprintingProtectionOverrides(fingerprintOverrides(settings));
         runtime.getSettings().setLocales(locales(settings));
         applyPrefs(settings);
+        adblock = new Adblock(ctx, runtime, settings.adblock);
         installProxyExtension();
     }
 
@@ -115,6 +118,9 @@ public final class Engine {
         p.add(SetGeckoPreference.setIntPref("security.cert_pinning.enforcement_level", 2, user));
         // I PDF non eseguono script.
         p.add(SetGeckoPreference.setBoolPref("pdfjs.enableScripting", false, user));
+        // Pop-up: solo dopo un clic vero (non al primo tocco o scorrimento, usati dai «popunder»).
+        p.add(SetGeckoPreference.setBoolPref("dom.disable_open_during_load", true, user));
+        p.add(SetGeckoPreference.setStringPref("dom.popup_allowed_events", "click dblclick auxclick", user));
         // Modalità blindata: niente compilatori JIT, come il livello «Più sicuro» di Tor Browser.
         boolean jit = !s.hardened;
         p.add(SetGeckoPreference.setBoolPref("javascript.options.ion", jit, user));
@@ -224,6 +230,7 @@ public final class Engine {
         cb.setCookieBehavior(cookies);
         cb.setCookieBehaviorPrivateMode(cookies);
         applyPrefs(s);
+        adblock.setEnabled(s.adblock);
         sendProxyConfig();
     }
 
@@ -264,6 +271,7 @@ public final class Engine {
                         proxyApplied = true;
                         extensionFailed = false;
                         notifyWaiters(true);
+                        adblock.start(); // installazione e aggiornamenti solo dopo che il proxy è attivo
                         List<Runnable> late = new ArrayList<>(lateListeners);
                         lateListeners.clear();
                         for (Runnable r : late) r.run();

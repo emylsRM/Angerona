@@ -10,20 +10,24 @@ Browser privato dell'utente per Windows (`desktop/`, Electron) e Android (`andro
 
 ## Desktop (Electron)
 - `src/main.js` finestra, schede (WebContentsView), scorciatoie, IPC con controllo del mittente.
-- `src/privacy.js` DoH con `app.configureHostResolver` in modalità `secure`, proxy `fixed_servers` senza bypass, blocco tracker (@ghostery/adblocker, solo filtri di rete), cookie di terze parti, HTTPS-only.
+- `src/privacy.js` DoH con `app.configureHostResolver` in modalità `secure`, proxy `fixed_servers` senza bypass, scudi (@ghostery/adblocker con filtri di rete, cosmetici e scriptlet), cookie di terze parti, HTTPS-only.
 - `src/settings.js` provider DNS, motori di ricerca, validazione. `src/pages.js` pagine interne `angerona://` senza script.
 - `ui/` interfaccia; `ui/preload.js` espone solo canali in whitelist.
 - Verifica: `npm ci`, `npm run check`, prova con `xvfb-run` + Playwright `_electron.launch` (`--no-sandbox`).
-- `npm run filters` rigenera `resources/filters.bin` (EasyList, EasyPrivacy) e `resources/threats.bin` (URLhaus, Phishing Filter); le fonti sono in `src/lists.js`. Nel browser i tracker si aggiornano ogni settimana, i siti pericolosi ogni 12 ore.
+- Scudi «come Brave»: tre motori in `src/lists.js` → `resources/shields.bin` (EasyList, EasyPrivacy, Peter Lowe, filtri di uBlock Origin dal mirror di Ghostery, con `resources.json` per scriptlet e script sostitutivi), `cookies.bin` (EasyList Cookie, uBO annoyances-cookies), `threats.bin` (URLhaus, Phishing Filter). `npm run filters` li rigenera; nel browser si aggiornano ogni 2 giorni (siti pericolosi ogni 12 ore) in un worker thread. Se cambia il formato del motore, cambia il nome del file.
+- Gli script sostitutivi (`$redirect`, es. Google Analytics innocuo) si servono da `angerona-res://`: Chromium vieta i reindirizzamenti verso `data:` (ERR_UNSAFE_REDIRECT).
+- Pop-up: serve un gesto dell'utente (evento `input-event` negli ultimi 5 s, uno per finestra), e con gli scudi attivi l'indirizzo della finestra non deve corrispondere alle liste. Lo scudo nella barra apre un menu nativo per spegnere le protezioni su un sito (`settings.shieldsOff`, per dominio).
+- `src/urlclean.js`: debouncing dei link di tracciamento e rimozione degli identificativi di clic (fbclid, gclid…) sulla navigazione principale; i parametri utm_* restano.
 - L'interfaccia è servita dal protocollo `angerona-ui://` (sessione `angerona-ui`, senza rete): con il fusibile `GrantFileProtocolExtraPrivileges` spento `file://` non legge dentro `app.asar`. Non tornare a `loadFile`.
 - Fusibili Electron in `package.json` → `build.electronFuses` (niente RunAsNode, NODE_OPTIONS, `--inspect`; integrità dell'asar; solo asar). Playwright non può collegarsi all'app compilata: le prove si fanno su `electron .` in sviluppo.
 - `ANGERONA_SELFTEST=<file>` avvia, controlla interfaccia e pagina iniziale, scrive `ok` ed esce: lo usa la «Prova d'avvio» su GitHub. `ANGERONA_TEST_MINUTE_MS` accorcia i minuti della cancellazione automatica nelle prove.
-- `src/fp-preload.js` riduce l'impronta in ogni pagina e riquadro (anche about:blank creati dagli script): se aggiungi un'API da proteggere, salva l'originale prima di sostituirla per non applicare il disturbo due volte.
+- `src/page-preload.js` gira in ogni pagina e riquadro: chiede al processo principale le regole cosmetiche (`shields:page`, sincrono, poi `shields:dom` per classi/id/link) ed esegue gli scriptlet con `contextBridge.executeInMainWorld` (niente CSP del sito); poi riduce l'impronta (anche negli about:blank creati dagli script). Se aggiungi un'API da proteggere, salva l'originale prima di sostituirla per non applicare il disturbo due volte.
 - Rete locale: le pagine su Internet non possono chiedere risorse a indirizzi privati (`isPrivateHost` in `privacy.js`); la navigazione principale verso il router resta libera.
 
 ## Android (GeckoView)
 - Versione motore in `android/gradle.properties` (`geckoviewVersion=NNN.+`). AGP, Gradle e compileSdk vanno allineati a quelli del branch `release` di mozilla-firefox/firefox (GeckoView 159 richiede compileSdk 37.2).
 - Preferenze di Firefox impostate da `Engine.hardeningPrefs` con `GeckoPreferenceController` (ramo utente, riapplicate a ogni avvio e salvataggio). La modalità blindata spegne i JIT subito; i processi isolati (`isolatedProcessEnabled`) cambiano solo a processo nuovo: «Cancella tutto ed esci» termina il processo apposta.
+- uBlock Origin (`Adblock.java`): installato da AMO (`latest.xpi`, firmato Mozilla) solo dopo che il proxy è attivo, consentito in privato, aggiornato una volta al giorno; il PromptDelegate accetta solo l'id `uBlock0@raymondhill.net`. `MainActivity` fa da `Adblock.Host` (pannello del pulsante in un Dialog con GeckoView, schede aperte/chiuse dall'estensione) e segnala la scheda attiva con `setTabActive`.
 - Blocco con impronta/PIN (`AppLock`, BiometricPrompt di sistema) e cancellazione automatica sono gestiti in `MainActivity` contando le attività avviate: l'app «esce» quando nessuna è visibile; le app esterne aperte per un risultato (scelta file, PIN) non contano.
 - Proxy tramite estensione interna `app/src/main/assets/extensions/proxy`: blocca tutto finché l'app non invia la configurazione; `Engine.canBrowse()` ferma i caricamenti se il proxy non è confermato.
 - Gli stili `Angerona.*` ereditano dallo stile base `Angerona` in `themes.xml`: non rimuoverlo.

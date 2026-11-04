@@ -25,7 +25,7 @@
         <button id="zoom" type="button" class="zoom" hidden title="Ripristina zoom (Ctrl+0)"></button>
       </label>
       <span id="notice" role="status" aria-live="polite"></span>
-      <button id="shield" class="shield" title="Tracker bloccati in questa pagina"></button>
+      <button id="shield" class="shield" title="Tracker bloccati in questa pagina" aria-haspopup="menu"></button>
       <button id="burn" class="burn" title="Cancella le tracce subito (Ctrl+Maiusc+Canc)" aria-label="Cancella le tracce subito"></button>
       <button id="open-settings" class="icon-btn" title="Impostazioni (Ctrl+,)" aria-label="Impostazioni"></button>
     </div>
@@ -113,7 +113,12 @@
         <div class="card">
           <h2>Protezioni</h2>
           <label class="toggle"><input type="checkbox" name="httpsOnly"><span><b>Solo HTTPS</b><small>Apre i siti sempre in versione cifrata. Se un sito non la offre, te lo chiede.</small></span></label>
-          <label class="toggle"><input type="checkbox" name="blockTrackers"><span><b>Blocca tracker e pubblicità</b><small id="filters-info">Liste EasyList ed EasyPrivacy.</small></span></label>
+          <label class="toggle"><input type="checkbox" name="blockTrackers"><span><b>Blocca pubblicità, tracker e pop-up</b><small>Le stesse liste di Brave e uBlock Origin: EasyList, EasyPrivacy, uBlock Origin e Peter Lowe. Nasconde anche gli spazi vuoti degli annunci, toglie dai link gli identificativi di tracciamento e blocca le finestre pop-up. Vale per le nuove schede.</small><small id="filters-info"></small></span></label>
+          <label class="toggle"><input type="checkbox" name="blockCookieBanners"><span><b>Blocca i banner dei cookie</b><small>Nasconde o chiude gli avvisi «Accetta i cookie», come fa Brave (EasyList Cookie e uBlock Origin).</small></span></label>
+          <div class="shields-off" id="shields-off" hidden>
+            <span class="muted small">Protezioni spente su: <span id="shields-off-list"></span></span>
+            <button type="button" id="shields-on-all" class="btn ghost small">Riattiva ovunque</button>
+          </div>
           <label class="toggle"><input type="checkbox" name="blockThreats"><span><b>Blocca siti di truffa e malware</b><small id="threats-info">Liste URLhaus e Phishing Filter, controllate sul computer: nessun indirizzo viene inviato a terzi.</small></span></label>
           <label class="toggle"><input type="checkbox" name="blockThirdPartyCookies"><span><b>Blocca i cookie di terze parti</b><small>Impedisce ai siti esterni di seguirti di pagina in pagina. Qualche accesso incorporato potrebbe non funzionare.</small></span></label>
           <label class="toggle"><input type="checkbox" name="reduceFingerprint"><span><b>Riduci l'impronta del browser</b><small>Grafica, audio e scheda video ricevono un piccolo disturbo diverso per ogni sito, così non ti riconoscono da un sito all'altro. Vale per le nuove schede.</small></span></label>

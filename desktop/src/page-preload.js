@@ -1,17 +1,99 @@
 'use strict';
-// Riduzione dell'impronta del browser, eseguita in ogni pagina e riquadro prima degli script del sito.
-// Grafica (canvas, WebGL) e audio ricevono un disturbo minimo, stabile sullo stesso sito e diverso
-// tra siti e tra sessioni; scheda video e hardware si presentano come quelli più comuni.
-// Non tocca schermo, caratteri, lingua e fuso orario: cambiarli romperebbe i siti.
-const { contextBridge } = require('electron');
+// Eseguito in ogni pagina e riquadro prima degli script del sito, in un mondo separato dalla pagina.
+// 1. Scudi (come Brave): nasconde annunci e banner dei cookie con i filtri cosmetici ed esegue gli
+//    «scriptlet» di uBlock Origin che disinnescano popup, anti-adblock e tracciamento.
+// 2. Impronta: grafica (canvas, WebGL) e audio ricevono un disturbo minimo, stabile sullo stesso
+//    sito e diverso tra siti e tra sessioni; scheda video e hardware si presentano come i più comuni.
+//    Non tocca schermo, caratteri, lingua e fuso orario: cambiarli romperebbe i siti.
+const { contextBridge, ipcRenderer, webFrame } = require('electron');
 
-const PREFIX = '--angerona-fp=';
-const arg = process.argv.find((a) => a.startsWith(PREFIX));
-if (arg) {
+const FP_PREFIX = '--angerona-fp=';
+const fpArg = process.argv.find((a) => a.startsWith(FP_PREFIX));
+const shields = process.argv.includes('--angerona-shields');
+
+if (fpArg) {
   try {
-    contextBridge.executeInMainWorld({ func: install, args: [arg.slice(PREFIX.length)] });
+    contextBridge.executeInMainWorld({ func: install, args: [fpArg.slice(FP_PREFIX.length)] });
   } catch { /* pagina senza contesto JavaScript */ }
 }
+
+if (shields && /^https?:/.test(location.href)) startShields();
+
+// ---------- Scudi ----------
+
+function insertStyles(css) {
+  try { webFrame.insertCSS(css, { cssOrigin: 'user' }); } catch { /* documento chiuso */ }
+}
+
+/** Esegue gli scriptlet nel mondo della pagina, prima dei suoi script e senza passare dalla sua CSP. */
+function runInPage(code) {
+  try {
+    // eslint-disable-next-line no-new-func
+    contextBridge.executeInMainWorld({ func: new Function(code) });
+  } catch {
+    webFrame.executeJavaScript(code).catch(() => {});
+  }
+}
+
+function startShields() {
+  let rules = null;
+  try { rules = ipcRenderer.sendSync('shields:page', location.href); } catch { return; }
+  if (!rules || !rules.active) return;
+  if (rules.scripts && rules.scripts.length) runInPage(rules.scripts.join('\n;\n'));
+  if (rules.styles) insertStyles(rules.styles);
+  watchDom();
+}
+
+// Regole generiche (es. «##.banner-pubblicita»): si chiedono solo per le classi, gli id e i link che
+// compaiono davvero nella pagina, man mano che la pagina cambia.
+function watchDom() {
+  const MAX = 20000;
+  const seen = { classes: new Set(), ids: new Set(), hrefs: new Set() };
+  let queue = { classes: [], ids: [], hrefs: [] };
+  let timer = null;
+
+  const remember = (set, list, value) => {
+    if (!value || set.has(value) || set.size >= MAX) return;
+    set.add(value);
+    list.push(value);
+  };
+  const visit = (el) => {
+    if (el.id) remember(seen.ids, queue.ids, el.id);
+    if (el.classList) for (const c of el.classList) remember(seen.classes, queue.classes, c);
+    if (el.tagName === 'A') remember(seen.hrefs, queue.hrefs, el.getAttribute('href'));
+  };
+  const scan = (root) => {
+    if (root.nodeType !== 1) return;
+    visit(root);
+    for (const el of root.querySelectorAll('[id],[class],a[href]')) visit(el);
+  };
+  const flush = () => {
+    timer = null;
+    const batch = queue;
+    queue = { classes: [], ids: [], hrefs: [] };
+    if (!batch.classes.length && !batch.ids.length && !batch.hrefs.length) return;
+    ipcRenderer.invoke('shields:dom', { url: location.href, ...batch })
+      .then((css) => { if (css) insertStyles(css); })
+      .catch(() => {});
+  };
+  const schedule = () => { if (!timer) timer = setTimeout(flush, 150); };
+
+  const begin = () => {
+    scan(document.documentElement);
+    flush();
+    new MutationObserver((mutations) => {
+      for (const m of mutations) {
+        if (m.type === 'attributes') visit(m.target);
+        else for (const n of m.addedNodes) scan(n);
+      }
+      schedule();
+    }).observe(document.documentElement, { childList: true, subtree: true, attributes: true, attributeFilter: ['class', 'id'] });
+  };
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', begin, { once: true });
+  else begin();
+}
+
+// ---------- Impronta ----------
 
 // Viene serializzata ed eseguita nel mondo della pagina: non può usare nulla di esterno.
 // `w` è la finestra da proteggere: la pagina stessa o un suo riquadro vuoto (about:blank) creato

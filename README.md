@@ -14,7 +14,9 @@ Browser privato e leggero per **Windows** e **Android**, con il nome della dea r
 | | Windows | Android |
 |---|---|---|
 | Motore | Chromium (Electron 45) | Firefox (GeckoView 159) |
-| Blocco tracker | EasyList + EasyPrivacy, aggiornate ogni settimana | Protezione antitracciamento rigorosa di Firefox |
+| Pubblicità, tracker e pop-up | Liste di Brave e uBlock Origin (EasyList, EasyPrivacy, uBlock Origin, Peter Lowe) con filtri cosmetici e scriptlet, banner dei cookie, aggiornate ogni 2 giorni | uBlock Origin integrato + protezione antitracciamento rigorosa di Firefox |
+| Link di tracciamento | intermediari saltati, fbclid/gclid & co. tolti | parametri di tracciamento tolti (Firefox) |
+| Scudi per sito | menu dello scudo nella barra | menu → «Blocco pubblicità su questo sito» |
 | Fughe di IP via WebRTC | bloccate | WebRTC spento (attivabile, passa solo dal proxy) |
 | Siti di truffa e malware | URLhaus + Phishing Filter, aggiornate ogni 12 ore | Safe Browsing di Firefox |
 | Rete locale (router, app sul dispositivo) | non raggiungibile dalle pagine web | non raggiungibile dalle pagine web |

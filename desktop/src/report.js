@@ -45,7 +45,7 @@ function evaluate(s) {
       ? 'Vedono il tipo di browser, la lingua, il fuso orario e la risoluzione dello schermo.'
       : 'Vedono solo il tipo di browser e la lingua: senza JavaScript non leggono schermo e altri dettagli.',
     s.blockTrackers
-      ? 'I tracker pubblicitari conosciuti non vengono caricati.'
+      ? 'Pubblicità, tracker e finestre pop-up vengono bloccati con le stesse liste di Brave e uBlock Origin; gli spazi vuoti degli annunci spariscono.'
       : 'I tracker pubblicitari presenti nella pagina possono registrare la tua visita.',
     s.blockThirdPartyCookies
       ? 'I servizi esterni incorporati (pulsanti social, video) non ricevono i loro cookie.'
@@ -60,6 +60,10 @@ function evaluate(s) {
       : 'I siti di truffa e malware non vengono bloccati.',
     'Non trovano cronologia precedente: cookie e dati spariscono alla chiusura.',
   ];
+  if (s.blockTrackers) sites.push('Dai link vengono tolti gli identificativi di clic (fbclid, gclid…) e i passaggi da intermediari di tracciamento.');
+  if (s.blockTrackers && s.blockCookieBanners) sites.push('Gli avvisi «Accetta i cookie» vengono nascosti o chiusi.');
+  const off = Array.isArray(s.shieldsOff) ? s.shieldsOff.length : 0;
+  if (s.blockTrackers && off) sites.push(off === 1 ? 'Su 1 sito hai spento le protezioni dal pulsante con lo scudo.' : `Su ${off} siti hai spento le protezioni dal pulsante con lo scudo.`);
   if (s.hardened) sites.push('Modalità blindata: JavaScript gira senza compilatore veloce, quindi è molto più difficile da attaccare.');
 
   const isp = [];
@@ -106,7 +110,7 @@ function evaluate(s) {
   if (!doh) tips.push({ text: 'Scegli un DNS cifrato, per esempio Quad9 o Mullvad.', gain: 20 });
   else if (got.dns < 20) tips.push({ text: 'Quad9, Mullvad e AdGuard dichiarano di non conservare il tuo IP.', gain: 20 - got.dns });
   if (!s.httpsOnly) tips.push({ text: 'Attiva «Solo HTTPS».', gain: 15 });
-  if (!s.blockTrackers) tips.push({ text: 'Attiva il blocco di tracker e pubblicità.', gain: 15 });
+  if (!s.blockTrackers) tips.push({ text: 'Attiva il blocco di pubblicità, tracker e pop-up.', gain: 15 });
   if (!s.blockThirdPartyCookies) tips.push({ text: 'Blocca i cookie di terze parti.', gain: 10 });
   if (!s.reduceFingerprint) tips.push({ text: "Attiva la riduzione dell'impronta del browser.", gain: 5 });
   if (s.javascript) tips.push({ text: 'Disattivare JavaScript riduce ancora le informazioni sul dispositivo, ma molti siti smettono di funzionare.', gain: 5 });

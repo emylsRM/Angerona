@@ -105,6 +105,7 @@ final class PrivacyReport {
         sites.sees.add(s.blockTrackers
             ? "Tracker, cryptominer e tracciamento social vengono bloccati in modo rigoroso."
             : "Vengono bloccati solo i tracker più noti (protezione standard).");
+        if (s.adblock) sites.sees.add("Pubblicità, tracker e pop-up pubblicitari vengono bloccati da uBlock Origin, con le stesse liste di Brave; gli spazi vuoti degli annunci spariscono.");
         sites.sees.add(s.blockThirdPartyCookies
             ? "I servizi esterni incorporati non ricevono cookie."
             : "I cookie dei servizi esterni restano isolati sito per sito: non possono seguirti tra siti diversi.");
@@ -151,6 +152,7 @@ final class PrivacyReport {
         else if (dnsPoints < 20) r.tips.add(new Tip("Quad9, Mullvad e AdGuard dichiarano di non conservare il tuo IP.", 20 - dnsPoints));
         if (!s.httpsOnly) r.tips.add(new Tip("Attiva «Solo HTTPS».", 15));
         if (!s.blockTrackers) r.tips.add(new Tip("Attiva la protezione rigorosa dai tracker.", 7));
+        if (!s.adblock) r.tips.add(new Tip("Attiva il blocco di pubblicità e pop-up (uBlock Origin).", 0));
         if (!s.blockThirdPartyCookies) r.tips.add(new Tip("Blocca del tutto i cookie di terze parti.", 4));
         if ("standard".equals(s.fingerprint)) r.tips.add(new Tip("Scegli la protezione dall'impronta «Rafforzata».", 3));
         else if ("rafforzata".equals(s.fingerprint)) r.tips.add(new Tip("Con l'impronta «Massima» sembri uguale a molti altri utenti (ora UTC, lingua inglese).", 2));

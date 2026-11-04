@@ -1,6 +1,6 @@
 'use strict';
-// Protezioni di rete: DNS cifrato, proxy, blocco di tracker e siti pericolosi, rete locale,
-// cookie di terze parti, HTTPS-only, certificati.
+// Protezioni di rete: DNS cifrato, proxy, scudi contro pubblicità e tracker (come Brave), siti
+// pericolosi, rete locale, cookie di terze parti, parametri di tracciamento, HTTPS-only, certificati.
 const fs = require('node:fs');
 const path = require('node:path');
 const { Worker } = require('node:worker_threads');
@@ -8,13 +8,20 @@ const { app, session } = require('electron');
 const { getDomain, parse } = require('tldts');
 const { FiltersEngine, Request } = require('@ghostery/adblocker');
 const { dohTemplate } = require('./settings');
-const { TRACKER_LISTS, THREAT_LISTS, ENGINE_CONFIG } = require('./lists');
+const {
+  TRACKER_LISTS, COOKIE_LISTS, THREAT_LISTS, RESOURCES, COSMETIC_CONFIG, NETWORK_CONFIG,
+} = require('./lists');
+const { cleanNavigation } = require('./urlclean');
 
-// Due motori separati: tracker (aggiornati ogni settimana) e siti pericolosi (ogni 12 ore).
+// Tre motori separati, ciascuno con il suo file e la sua frequenza di aggiornamento.
+// I nomi dei file cambiano quando cambia il formato (versioni precedenti: filters.bin senza cosmetici).
+const DAY = 24 * 3600 * 1000;
 const KINDS = {
-  trackers: { file: 'filters.bin', lists: TRACKER_LISTS, maxAge: 7 * 24 * 3600 * 1000, minSize: 10000 },
-  threats: { file: 'threats.bin', lists: THREAT_LISTS, maxAge: 12 * 3600 * 1000, minSize: 1000 },
+  trackers: { file: 'shields.bin', lists: TRACKER_LISTS, resources: true, config: COSMETIC_CONFIG, maxAge: 2 * DAY, minSize: 1000 },
+  cookies: { file: 'cookies.bin', lists: COOKIE_LISTS, resources: true, config: COSMETIC_CONFIG, maxAge: 2 * DAY, minSize: 1000 },
+  threats: { file: 'threats.bin', lists: THREAT_LISTS, resources: false, config: NETWORK_CONFIG, maxAge: DAY / 2, minSize: 1000 },
 };
+const AD_KINDS = ['trackers', 'cookies'];
 
 const RESOURCE_TYPES = {
   mainFrame: 'main_frame', subFrame: 'sub_frame', stylesheet: 'stylesheet', script: 'script',
@@ -67,11 +74,14 @@ class Privacy {
     this.settings = settings;
     this.dataDir = dataDir;
     this.onBlocked = onBlocked;
-    this.engines = { trackers: null, threats: null };
+    this.engines = { trackers: null, cookies: null, threats: null };
     this.info = {
       trackers: { rules: 0, updated: null, source: 'nessuna' },
+      cookies: { rules: 0, updated: null, source: 'nessuna' },
       threats: { rules: 0, updated: null, source: 'nessuna' },
     };
+    this.shieldsOff = new Set(settings.shieldsOff || []); // siti con le protezioni spente
+    this.surrogates = new Map(); // id -> contenuto sostitutivo
     this.httpAllowed = new Set(); // host per cui l'utente ha accettato HTTP in questa sessione
     this.threatAllowed = new Set(); // host segnalati che l'utente ha voluto aprire comunque
     this.upgraded = new Map(); // webContentsId -> URL http originale riscritto in https
@@ -82,6 +92,16 @@ class Privacy {
   get engine() { return this.engines.trackers; }
   get filtersInfo() { return this.info.trackers; }
   get threatsInfo() { return this.info.threats; }
+  get cookiesInfo() { return this.info.cookies; }
+
+  /** Le protezioni contro pubblicità e tracker valgono per questa pagina? (false = spente dall'utente) */
+  shieldsActiveFor(url) {
+    return Boolean(this.settings.blockTrackers) && !this.shieldsOff.has(siteOf(url));
+  }
+
+  #adKinds() {
+    return AD_KINDS.filter((k) => this.engines[k] && (k !== 'cookies' || this.settings.blockCookieBanners));
+  }
 
   /** Dimentica le scelte fatte in questa sessione (HTTP accettato, siti segnalati aperti comunque). */
   forgetSessionChoices() {
@@ -115,7 +135,12 @@ class Privacy {
   }
 
   loadFilters() {
+    // Le versioni precedenti salvavano le liste dei tracker in filters.bin (senza filtri cosmetici).
+    for (const old of ['filters.bin', 'filters.bin.json']) {
+      try { fs.rmSync(path.join(this.dataDir, old), { force: true }); } catch { /* ignorato */ }
+    }
     const trackers = this.#load('trackers');
+    this.#load('cookies');
     this.#load('threats');
     return trackers;
   }
@@ -126,22 +151,33 @@ class Privacy {
   }
 
   // Scarica le liste passando dalla sessione del browser, quindi da DNS cifrato e proxy.
-  async updateFilters(kind = 'trackers') {
-    const { lists, minSize } = KINDS[kind];
-    const texts = [];
-    for (const mirrors of lists) {
-      let text = null;
-      for (const url of mirrors) {
-        try {
-          const res = await this.ses.fetch(url, { credentials: 'omit', cache: 'no-store', signal: AbortSignal.timeout(30000) });
-          if (res.ok) { text = await res.text(); if (text.length > minSize) break; }
-          text = null;
-        } catch { /* prova il mirror successivo */ }
-      }
-      if (!text) throw new Error('Liste di protezione non raggiungibili');
-      texts.push(text);
+  async #download(mirrors, minSize) {
+    for (const url of mirrors) {
+      try {
+        const res = await this.ses.fetch(url, { credentials: 'omit', cache: 'no-store', signal: AbortSignal.timeout(30000) });
+        if (res.ok) {
+          const text = await res.text();
+          if (text.length > minSize) return text;
+        }
+      } catch { /* prova il mirror successivo */ }
     }
-    const { data, rules } = await buildEngine(texts.join('\n'));
+    return null;
+  }
+
+  async updateFilters(kind = 'trackers') {
+    const { lists, minSize, resources, config } = KINDS[kind];
+    const texts = [];
+    for (const { mirrors, optional } of lists) {
+      const text = await this.#download(mirrors, minSize);
+      if (text) texts.push(text);
+      else if (!optional) throw new Error('Liste di protezione non raggiungibili');
+    }
+    let res = null;
+    if (resources) {
+      res = await this.#download(RESOURCES, 1000);
+      if (!res) throw new Error('Risorse di uBlock Origin non raggiungibili');
+    }
+    const { data, rules } = await buildEngine(texts.join('\n'), config, res);
     const file = this.#cacheFile(kind);
     fs.writeFileSync(`${file}.tmp`, data);
     fs.renameSync(`${file}.tmp`, file);
@@ -174,6 +210,7 @@ class Privacy {
   updateSettings(s) {
     const strictChanged = Boolean(this.settings.strictCerts) !== Boolean(s.strictCerts);
     this.settings = s;
+    this.shieldsOff = new Set(s.shieldsOff || []);
     // Il risultato della verifica dei certificati resta in memoria: reinstallare la verifica lo azzera.
     if (strictChanged) this.ses.setCertificateVerifyProc((req, cb) => cb(this.#verifyCert(req)));
   }
@@ -230,13 +267,93 @@ class Privacy {
     return siteOf(d.url) !== siteOf(top);
   }
 
-  #matches(engine, d) {
+  #request(d) {
     const top = this.#topUrl(d);
-    return engine.match(Request.fromRawDetails({
+    return Request.fromRawDetails({
       url: d.url,
       sourceUrl: /^https?:/.test(top) ? top : '',
       type: RESOURCE_TYPES[d.resourceType] || 'other',
-    })).match;
+    });
+  }
+
+  #matches(engine, d) {
+    return engine.match(this.#request(d)).match;
+  }
+
+  /** Pubblicità e tracker: blocco, oppure sostituzione con uno script innocuo (come uBlock Origin). */
+  #matchAds(d) {
+    const req = this.#request(d);
+    for (const kind of this.#adKinds()) {
+      const { match, redirect } = this.engines[kind].match(req);
+      if (redirect && redirect.body !== undefined) return { redirectURL: this.#surrogateUrl(redirect) };
+      if (match) return { cancel: true };
+    }
+    return null;
+  }
+
+  // I contenuti sostitutivi (pochi, piccoli) restano in memoria e si servono da angerona-res://r/<id>.
+  #surrogateUrl(redirect) {
+    const id = require('node:crypto').createHash('sha256').update(redirect.dataUrl || redirect.body).digest('hex').slice(0, 24);
+    if (!this.surrogates.has(id)) {
+      if (this.surrogates.size > 500) this.surrogates.clear();
+      this.surrogates.set(id, { body: redirect.body, type: redirect.contentType || 'text/plain' });
+    }
+    return `angerona-res://r/${id}`;
+  }
+
+  serveSurrogate(url) {
+    let id = '';
+    try { id = new URL(url).pathname.slice(1); } catch { /* indirizzo non valido */ }
+    const item = this.surrogates.get(id);
+    if (!item) return new Response('', { status: 404 });
+    // Le risorse binarie (immagini, video vuoti) arrivano in base64.
+    const [type, encoding] = item.type.split(';');
+    const body = encoding === 'base64' ? Buffer.from(item.body, 'base64') : item.body;
+    return new Response(body, {
+      headers: { 'content-type': type, 'access-control-allow-origin': '*', 'cache-control': 'no-store' },
+    });
+  }
+
+  /**
+   * Una finestra pop-up verso un indirizzo di pubblicità o tracciamento (i «popunder»)? Le regole
+   * per dominio delle liste valgono anche per le finestre nuove, come in uBlock Origin.
+   */
+  isPopupBlocked(url, openerUrl) {
+    if (!this.shieldsActiveFor(openerUrl)) return false;
+    let req;
+    try {
+      req = Request.fromRawDetails({ url, sourceUrl: /^https?:/.test(openerUrl) ? openerUrl : '', type: 'main_frame' });
+    } catch { return false; }
+    return this.#adKinds().some((kind) => this.engines[kind].match(req).match);
+  }
+
+  /**
+   * Regole cosmetiche per una pagina o un riquadro: stili che nascondono annunci e banner, e
+   * scriptlet da eseguire prima degli script del sito. Con `dom` (classi, id e link trovati nella
+   * pagina) restituisce solo gli stili generici che li riguardano.
+   */
+  cosmeticsFor(url, topUrl, dom = null) {
+    const empty = { styles: '', scripts: [] };
+    if (!/^https?:/.test(url) || !this.shieldsActiveFor(topUrl || url)) return empty;
+    const info = parse(url, { allowPrivateDomains: true });
+    const hostname = info.hostname || '';
+    const domain = info.domain || hostname;
+    const query = dom
+      ? {
+        classes: dom.classes, ids: dom.ids, hrefs: dom.hrefs,
+        getBaseRules: false, getInjectionRules: false, getExtendedRules: false, getRulesFromHostname: false, getRulesFromDOM: true,
+      }
+      : { getBaseRules: true, getInjectionRules: true, getExtendedRules: false, getRulesFromHostname: true, getRulesFromDOM: false };
+    let styles = '';
+    const scripts = [];
+    for (const kind of this.#adKinds()) {
+      try {
+        const r = this.engines[kind].getCosmeticsFilters({ url, hostname, domain, ...query });
+        if (r.styles) styles += `${r.styles}\n`;
+        scripts.push(...r.scripts);
+      } catch { /* lista non utilizzabile per questa pagina */ }
+    }
+    return { styles, scripts };
   }
 
   #beforeRequest(d) {
@@ -245,6 +362,13 @@ class Privacy {
     const web = u.protocol === 'http:' || u.protocol === 'https:';
     if (!web && u.protocol !== 'ws:' && u.protocol !== 'wss:') return {};
     const mainFrame = d.resourceType === 'mainFrame';
+
+    // Link di tracciamento: si salta l'intermediario (google.com/url?q=…, l.facebook.com/l.php?u=…)
+    // e si tolgono gli identificativi di clic (fbclid, gclid…), come fa Brave.
+    if (mainFrame && web && this.shieldsActiveFor(d.url)) {
+      const clean = cleanNavigation(d.url);
+      if (clean) return { redirectURL: clean };
+    }
 
     // Una pagina su Internet non può contattare il computer né i dispositivi della rete locale
     // (router, stampanti, programmi in ascolto): niente scansioni né tracciamento via localhost.
@@ -269,9 +393,12 @@ class Privacy {
       return { redirectURL: u.toString() };
     }
 
-    if (this.settings.blockTrackers && this.engines.trackers && !mainFrame && this.#matches(this.engines.trackers, d)) {
-      if (d.webContentsId) this.onBlocked(d.webContentsId);
-      return { cancel: true };
+    if (!mainFrame && this.shieldsActiveFor(this.#topUrl(d) || d.url)) {
+      const blocked = this.#matchAds(d);
+      if (blocked) {
+        if (d.webContentsId) this.onBlocked(d.webContentsId);
+        return blocked;
+      }
     }
     return {};
   }
@@ -299,7 +426,10 @@ class Privacy {
 }
 
 function countRules(engine) {
-  try { return engine.getFilters().networkFilters.length; } catch { return 0; }
+  try {
+    const f = engine.getFilters();
+    return f.networkFilters.length + f.cosmeticFilters.length;
+  } catch { return 0; }
 }
 
 function readRuleCount(file) {
@@ -309,30 +439,33 @@ function readRuleCount(file) {
   } catch { return null; }
 }
 
-// Le liste dei siti pericolosi hanno oltre 150.000 regole: prepararle richiede qualche secondo,
-// quindi lo si fa in un thread separato per non bloccare il browser. Se il thread non parte,
-// si ripiega sul thread principale.
+// Le liste contano centinaia di migliaia di regole: prepararle richiede qualche secondo, quindi
+// lo si fa in un thread separato per non bloccare il browser. Se il thread non parte, si ripiega
+// sul thread principale.
 const ADBLOCKER_PATH = require.resolve('@ghostery/adblocker');
 const WORKER_CODE = `
   const { parentPort, workerData } = require('node:worker_threads');
   const { FiltersEngine } = require(workerData.lib);
   const engine = FiltersEngine.parse(workerData.text, workerData.config);
+  if (workerData.resources) engine.updateResources(workerData.resources, String(workerData.resources.length));
   const data = engine.serialize();
-  parentPort.postMessage({ data, rules: engine.getFilters().networkFilters.length });
+  const f = engine.getFilters();
+  parentPort.postMessage({ data, rules: f.networkFilters.length + f.cosmeticFilters.length });
 `;
 
-function buildEngineInline(text) {
-  const engine = FiltersEngine.parse(text, ENGINE_CONFIG);
+function buildEngineInline(text, config, resources) {
+  const engine = FiltersEngine.parse(text, config);
+  if (resources) engine.updateResources(resources, String(resources.length));
   return { data: engine.serialize(), rules: countRules(engine), worker: false };
 }
 
-function buildEngine(text) {
+function buildEngine(text, config = NETWORK_CONFIG, resources = null) {
   return new Promise((resolve) => {
     let worker;
     try {
-      worker = new Worker(WORKER_CODE, { eval: true, workerData: { lib: ADBLOCKER_PATH, text, config: ENGINE_CONFIG } });
+      worker = new Worker(WORKER_CODE, { eval: true, workerData: { lib: ADBLOCKER_PATH, text, config, resources } });
     } catch {
-      resolve(buildEngineInline(text));
+      resolve(buildEngineInline(text, config, resources));
       return;
     }
     let settled = false;
@@ -341,7 +474,7 @@ function buildEngine(text) {
       settled = true;
       clearTimeout(timer);
       worker.terminate().catch(() => {});
-      resolve(value || buildEngineInline(text));
+      resolve(value || buildEngineInline(text, config, resources));
     };
     const timer = setTimeout(() => finish(null), 120000);
     worker.once('message', (m) => finish({ data: new Uint8Array(m.data), rules: m.rules, worker: true }));
@@ -366,4 +499,6 @@ function inputToUrl(input, makeSearchUrl) {
   return makeSearchUrl(t);
 }
 
-module.exports = { Privacy, inputToUrl, isPrivateHost, isPublicWebUrl, buildEngine };
+module.exports = {
+  Privacy, inputToUrl, isPrivateHost, isPublicWebUrl, buildEngine, siteOf,
+};
