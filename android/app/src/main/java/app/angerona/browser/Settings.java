@@ -87,6 +87,7 @@ public final class Settings {
     public boolean hardened = false;
     public int autoClear = 0;
     public boolean appLock = false;
+    public boolean adblock = true;
 
     private static final String PREFS = "angerona";
     private static final String KEY_ALIAS = "angerona-proxy";
@@ -106,6 +107,7 @@ public final class Settings {
         s.hardened = hardened;
         s.autoClear = autoClear;
         s.appLock = appLock;
+        s.adblock = adblock;
         return s;
     }
 
@@ -224,6 +226,7 @@ public final class Settings {
         s.hardened = p.getBoolean("hardened", s.hardened);
         s.autoClear = p.getInt("autoClear", s.autoClear);
         s.appLock = p.getBoolean("appLock", s.appLock);
+        s.adblock = p.getBoolean("adblock", s.adblock);
         if (!String.valueOf(s.autoClear).equals(AUTO_CLEAR[indexOf(AUTO_CLEAR, String.valueOf(s.autoClear))][0])) s.autoClear = 0;
         // Valori sconosciuti (versioni future o file alterati) tornano ai predefiniti.
         if (!s.dns.equals(DNS[indexOf(DNS, s.dns)][0])) s.dns = "quad9";
@@ -260,6 +263,7 @@ public final class Settings {
             .putBoolean("hardened", hardened)
             .putInt("autoClear", autoClear)
             .putBoolean("appLock", appLock)
+            .putBoolean("adblock", adblock)
             .commit();
     }
 

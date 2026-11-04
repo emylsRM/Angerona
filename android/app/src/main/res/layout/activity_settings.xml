@@ -239,6 +239,11 @@
                 <TextView style="@style/Angerona.Help" android:text="Apre i siti sempre in versione cifrata." />
                 <Switch android:id="@+id/switch_trackers" style="@style/Angerona.Switch" android:text="Protezione rigorosa dai tracker" />
                 <TextView style="@style/Angerona.Help" android:text="Blocca tracker, cryptominer, fingerprinting e tracciamento social. Se disattivata resta la protezione standard." />
+                <Switch android:id="@+id/switch_adblock" style="@style/Angerona.Switch" android:text="Blocca pubblicità e pop-up (uBlock Origin)" />
+                <TextView style="@style/Angerona.Help" android:text="Le stesse liste di Brave: EasyList, EasyPrivacy, uBlock Origin e Peter Lowe. Nasconde gli spazi vuoti degli annunci e chiude i pop-up pubblicitari. La prima volta si scarica dal sito dei componenti aggiuntivi di Mozilla, poi si aggiorna da solo. Per un sito che non funziona: menu → «Blocco pubblicità su questo sito»." />
+                <TextView android:id="@+id/adblock_status" style="@style/Angerona.Help" android:textColor="@color/text2" />
+                <Button android:id="@+id/btn_adblock" style="@style/Angerona.Button" android:text="Liste e aggiornamenti di uBlock Origin" />
+                <TextView style="@style/Angerona.Help" android:text="Lì puoi aggiornare subito le liste e aggiungere, tra i «Fastidi», quelle per i banner dei cookie." />
                 <Switch android:id="@+id/switch_cookies" style="@style/Angerona.Switch" android:text="Blocca i cookie di terze parti" />
                 <TextView style="@style/Angerona.Help" android:text="Altrimenti i cookie esterni restano comunque isolati sito per sito." />
                 <TextView style="@style/Angerona.Label" android:text="Protezione dall'impronta del browser" />

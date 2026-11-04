@@ -3,6 +3,7 @@ package app.angerona.browser;
 import android.app.Activity;
 import android.app.AlertDialog;
 import android.app.Application;
+import android.app.Dialog;
 import android.content.ActivityNotFoundException;
 import android.content.ClipData;
 import android.content.ClipboardManager;
@@ -46,8 +47,11 @@ import org.mozilla.geckoview.GeckoSession;
 import org.mozilla.geckoview.GeckoSessionSettings;
 import org.mozilla.geckoview.GeckoView;
 import org.mozilla.geckoview.StorageController;
+import org.mozilla.geckoview.WebExtension;
 import org.mozilla.geckoview.WebRequestError;
 import org.mozilla.geckoview.WebResponse;
+
+import java.util.function.Consumer;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -141,6 +145,8 @@ public class MainActivity extends Activity {
 
         engine = Engine.get(this);
         lockOverlay = buildLockOverlay();
+        engine.adblock.setHost(adblockHost);
+        engine.adblock.addListener(adblockReady);
         if (engine.settings().appLock && AppLock.available(this)) setLocked(true);
         getApplication().registerActivityLifecycleCallbacks(lifecycle);
         prompts = new Prompts(this);
@@ -196,6 +202,86 @@ public class MainActivity extends Activity {
         }
         // Con il blocco attivo le app recenti non mostrano l'anteprima delle schede.
         if (Build.VERSION.SDK_INT >= 33 && engine != null) setRecentsScreenshotEnabled(!engine.settings().appLock);
+    }
+
+    // ---------- uBlock Origin ----------
+
+    /** Quando uBlock Origin è pronto (o aggiornato) si collegano tutte le schede aperte. */
+    private final Consumer<WebExtension> adblockReady = ext -> {
+        for (Tab t : tabs) engine.adblock.attach(t.session);
+    };
+
+    private Dialog adblockDialog;
+
+    private Tab tabOf(GeckoSession session) {
+        for (Tab t : tabs) if (t.session == session) return t;
+        return null;
+    }
+
+    private final Adblock.Host adblockHost = new Adblock.Host() {
+        @Override
+        public GeckoSession openPopup() {
+            return showAdblockPanel();
+        }
+
+        @Override
+        public GeckoSession openTab(boolean active) {
+            Tab t = createTab();
+            int pos = current == null ? tabs.size() : tabs.indexOf(current) + 1;
+            tabs.add(Math.max(0, Math.min(pos, tabs.size())), t);
+            if (active) show(t);
+            render();
+            return t.session;
+        }
+
+        @Override
+        public void openUrl(String url) {
+            newTab(url, true, true);
+        }
+
+        @Override
+        public void closeTab(GeckoSession session) {
+            Tab t = tabOf(session);
+            if (t != null) MainActivity.this.closeTab(t);
+        }
+
+        @Override
+        public void selectTab(GeckoSession session) {
+            Tab t = tabOf(session);
+            if (t != null) show(t);
+        }
+    };
+
+    /** La finestra di uBlock Origin (accendere o spegnere il blocco sul sito) in un pannello dal basso. */
+    private GeckoSession showAdblockPanel() {
+        if (adblockDialog != null) adblockDialog.dismiss();
+        GeckoSession popup = new GeckoSession(new GeckoSessionSettings.Builder().usePrivateMode(true).build());
+        Dialog dialog = new Dialog(this);
+        popup.setContentDelegate(new GeckoSession.ContentDelegate() {
+            @Override
+            public void onCloseRequest(GeckoSession s) {
+                dialog.dismiss();
+            }
+        });
+        popup.open(engine.runtime);
+        GeckoView view = new GeckoView(this);
+        view.setViewBackend(GeckoView.BACKEND_TEXTURE_VIEW);
+        view.setSession(popup);
+        int height = (int) (getResources().getDisplayMetrics().heightPixels * 0.72);
+        dialog.setContentView(view, new ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, height));
+        dialog.setOnDismissListener(d -> {
+            if (view.getSession() != null) view.releaseSession();
+            if (popup.isOpen()) popup.close();
+            if (adblockDialog == d) adblockDialog = null;
+        });
+        if (dialog.getWindow() != null) {
+            dialog.getWindow().setLayout(ViewGroup.LayoutParams.MATCH_PARENT, height);
+            dialog.getWindow().setGravity(Gravity.BOTTOM);
+            dialog.getWindow().setBackgroundDrawableResource(R.color.page);
+        }
+        adblockDialog = dialog;
+        dialog.show();
+        return popup;
     }
 
     // ---------- Blocco con impronta o PIN ----------
@@ -412,6 +498,7 @@ public class MainActivity extends Activity {
         GeckoSession session = new GeckoSession(b.build());
         Tab tab = new Tab(session);
         attach(tab, session);
+        engine.adblock.attach(session);
         return tab;
     }
 
@@ -436,13 +523,25 @@ public class MainActivity extends Activity {
 
     private void show(Tab tab) {
         if (current == tab && geckoView.getSession() == tab.session) return;
-        if (current != null && current != tab) current.session.setActive(false);
+        if (current != null && current != tab) {
+            current.session.setActive(false);
+            markTabActive(current.session, false);
+        }
+        // Le estensioni (uBlock Origin) devono sapere qual è la scheda in primo piano.
+        markTabActive(tab.session, true);
         if (geckoView.getSession() != null) geckoView.releaseSession();
         geckoView.setSession(tab.session);
         if (tab.session.isOpen()) tab.session.setActive(true);
         current = tab;
         closeFind();
         render();
+    }
+
+    private void markTabActive(GeckoSession session, boolean active) {
+        if (!session.isOpen()) return;
+        try {
+            engine.runtime.getWebExtensionController().setTabActive(session, active);
+        } catch (RuntimeException ignored) { }
     }
 
     private void closeTab(Tab tab) {
@@ -757,7 +856,7 @@ public class MainActivity extends Activity {
     // ---------- Menu ----------
 
     private static final int M_BACK = 1, M_FORWARD = 2, M_RELOAD = 3, M_NEW = 4, M_FIND = 5,
-        M_HOME = 6, M_CHECK = 7, M_SETTINGS = 8, M_CLEAR_EXIT = 9;
+        M_HOME = 6, M_CHECK = 7, M_SETTINGS = 8, M_CLEAR_EXIT = 9, M_ADBLOCK = 10;
 
     private void showMenu(View anchor) {
         if (!ready) return;
@@ -771,6 +870,7 @@ public class MainActivity extends Activity {
         m.add(0, M_FIND, 5, "Trova nella pagina");
         m.add(0, M_CHECK, 6, "Test della privacy");
         m.add(0, M_SETTINGS, 7, "Impostazioni");
+        if (engine.settings().adblock) m.add(0, M_ADBLOCK, 6, "Blocco pubblicità su questo sito");
         m.add(0, M_CLEAR_EXIT, 8, "Cancella tutto ed esci");
         menu.setOnMenuItemClickListener(item -> {
             switch (item.getItemId()) {
@@ -789,6 +889,9 @@ public class MainActivity extends Activity {
                 case M_CHECK: showPrivacyTests(); return true;
                 case M_SETTINGS: startActivityForResult(new Intent(this, SettingsActivity.class), REQUEST_SETTINGS); return true;
                 case M_CLEAR_EXIT: clearAll(true, null); return true;
+                case M_ADBLOCK:
+                    if (!engine.adblock.openPanel()) Toast.makeText(this, "uBlock Origin: " + engine.adblock.status(), Toast.LENGTH_LONG).show();
+                    return true;
                 default: return false;
             }
         });
@@ -1003,6 +1106,10 @@ public class MainActivity extends Activity {
                 newTab(data.getStringExtra(EXTRA_URL), true, true);
             } else if ("update".equals(action)) {
                 updater.check(true);
+            } else if ("adblock".equals(action)) {
+                String url = engine.adblock.optionsUrl();
+                if (url != null) newTab(url + "#3p-filters.html", true, true);
+                else Toast.makeText(this, "uBlock Origin: " + engine.adblock.status(), Toast.LENGTH_LONG).show();
             } else if ("clear".equals(action)) {
                 clearAll(false, "Dati di navigazione cancellati");
             } else if (resultCode == RESULT_OK) {
@@ -1016,6 +1123,9 @@ public class MainActivity extends Activity {
     @Override
     protected void onDestroy() {
         getApplication().unregisterActivityLifecycleCallbacks(lifecycle);
+        engine.adblock.removeListener(adblockReady);
+        engine.adblock.setHost(null);
+        if (adblockDialog != null) adblockDialog.dismiss();
         handler.removeCallbacksAndMessages(null);
         if (isFinishing()) {
             if (geckoView.getSession() != null) geckoView.releaseSession();

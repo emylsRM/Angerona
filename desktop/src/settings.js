@@ -49,6 +49,8 @@ const DEFAULTS = Object.freeze({
   strictCerts: false,
   hardened: false,
   autoClear: 0,
+  blockCookieBanners: true,
+  shieldsOff: [],
 });
 
 // Minuti senza usare Angerona dopo i quali tutto viene cancellato (0 = mai).
@@ -111,6 +113,12 @@ function sanitize(input, previous = DEFAULTS) {
   s.strictCerts = bool(i.strictCerts, s.strictCerts);
   s.hardened = bool(i.hardened, s.hardened);
   if (AUTO_CLEAR_MINUTES.includes(Number(i.autoClear))) s.autoClear = Number(i.autoClear);
+  s.blockCookieBanners = bool(i.blockCookieBanners, s.blockCookieBanners);
+  // Siti con le protezioni spente dal pulsante con lo scudo (nomi di dominio, al massimo 500).
+  if (Array.isArray(i.shieldsOff)) {
+    const sites = i.shieldsOff.filter((d) => typeof d === 'string' && /^[a-z0-9.-]{1,253}$/i.test(d)).map((d) => d.toLowerCase());
+    s.shieldsOff = [...new Set(sites)].slice(0, 500);
+  }
   return { settings: s, errors };
 }
 

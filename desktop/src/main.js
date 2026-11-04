@@ -10,7 +10,7 @@ const {
 const {
   SettingsStore, sanitize, searchUrl, DNS_PROVIDERS, SEARCH_ENGINES, PROXY_MODES, AUTO_CLEAR_MINUTES,
 } = require('./settings');
-const { Privacy, inputToUrl, buildEngine } = require('./privacy');
+const { Privacy, inputToUrl, buildEngine, siteOf } = require('./privacy');
 const pages = require('./pages');
 const report = require('./report');
 const { Updater } = require('./updater');
@@ -20,7 +20,10 @@ const UI_PARTITION = 'angerona-ui';
 const UI_SCHEME = 'angerona-ui';
 const UI_DIR = path.join(__dirname, '..', 'ui');
 const UI_URL = `${UI_SCHEME}://app/index.html`;
-const FP_PRELOAD = path.join(__dirname, 'fp-preload.js');
+const PAGE_PRELOAD = path.join(__dirname, 'page-preload.js');
+// Eventi che contano come «gesto dell'utente»: senza, un sito non può aprire finestre (come Chrome).
+const USER_GESTURES = new Set(['mouseDown', 'mouseUp', 'keyDown', 'rawKeyDown', 'touchStart', 'touchEnd', 'gestureTap']);
+const GESTURE_MS = 5000;
 const HOME = 'angerona://start';
 const THEME = { strip: '#1C1846', bar: '#26215C', page: '#16132F', text: '#CECBF6' };
 const TABSTRIP_HEIGHT = 40;
@@ -72,6 +75,9 @@ function start() {
   protocol.registerSchemesAsPrivileged([
     { scheme: 'angerona', privileges: { standard: true, secure: true } },
     { scheme: UI_SCHEME, privileges: { standard: true, secure: true } },
+    // Script sostitutivi innocui (es. al posto di Google Analytics): Chromium vieta di reindirizzare
+    // le richieste verso indirizzi data:, quindi li serve un protocollo interno.
+    { scheme: 'angerona-res', privileges: { standard: true, secure: true, supportFetchAPI: true, corsEnabled: true } },
   ]);
   Menu.setApplicationMenu(null);
 
@@ -161,6 +167,7 @@ async function init() {
   await privacy.applyNetwork(store.value);
 
   ses.protocol.handle('angerona', (req) => pages.render(req.url, store.value, privacy));
+  ses.protocol.handle('angerona-res', (req) => privacy.serveSurrogate(req.url));
   ses.on('will-download', onDownload);
 
   updater = new Updater({
@@ -177,21 +184,35 @@ async function init() {
   // Controllo aggiornamenti all'avvio, attraverso DNS cifrato e proxy come ogni altra richiesta.
   if (store.value.checkUpdates) setTimeout(() => updater.check().catch(() => {}), 6000);
 
-  if (store.value.blockTrackers && privacy.needsFilterUpdate('trackers')) {
-    setTimeout(() => {
-      privacy.updateFilters('trackers').then(() => sendSettings()).catch(() => { /* riprova al prossimo avvio */ });
-    }, 4000);
-  }
-  // Le liste dei siti pericolosi cambiano più volte al giorno: controllo all'avvio e ogni ora.
-  const refreshThreats = () => {
-    if (!store.value.blockThreats || !privacy.needsFilterUpdate('threats')) return;
-    privacy.updateFilters('threats').then(() => sendSettings()).catch(() => { /* riprova più tardi */ });
+  // Liste aggiornate in automatico: pubblicità e cookie ogni 2 giorni, siti pericolosi ogni 12 ore.
+  // Controllo all'avvio e poi ogni ora, una lista alla volta.
+  let refreshing = false;
+  const refreshLists = async () => {
+    if (refreshing) return;
+    refreshing = true;
+    try {
+      for (const kind of enabledListKinds()) {
+        if (!privacy.needsFilterUpdate(kind)) continue;
+        try { await privacy.updateFilters(kind); sendSettings(); } catch { /* riprova più tardi */ }
+      }
+    } finally {
+      refreshing = false;
+    }
   };
-  setTimeout(refreshThreats, 5000);
-  setInterval(refreshThreats, 3600 * 1000);
+  setTimeout(refreshLists, 4000);
+  setInterval(refreshLists, 3600 * 1000);
   setInterval(checkAutoClear, Math.min(20000, MINUTE_MS / 3));
   powerMonitor.on('lock-screen', () => { if (focusLostAt === null) focusLostAt = Date.now(); });
   powerMonitor.on('unlock-screen', () => { if (win && win.isFocused()) focusLostAt = null; });
+}
+
+function enabledListKinds() {
+  const s = store.value;
+  return [
+    ...(s.blockTrackers ? ['trackers'] : []),
+    ...(s.blockTrackers && s.blockCookieBanners ? ['cookies'] : []),
+    ...(s.blockThreats ? ['threats'] : []),
+  ];
 }
 
 // Prova d'avvio usata dalla compilazione su GitHub: interfaccia e pagina iniziale devono caricarsi.
@@ -268,14 +289,16 @@ function layout() {
 // ---------- Schede ----------
 function viewPreferences() {
   const fp = store.value.reduceFingerprint;
+  const shields = store.value.blockTrackers;
+  const args = [...(fp ? [`--angerona-fp=${fpSeed}`] : []), ...(shields ? ['--angerona-shields'] : [])];
   return {
     partition: PARTITION,
     sandbox: true,
     contextIsolation: true,
     nodeIntegration: false,
-    // Con la riduzione dell'impronta lo script di protezione gira anche nei riquadri (sempre senza Node).
-    nodeIntegrationInSubFrames: fp,
-    ...(fp ? { preload: FP_PRELOAD, additionalArguments: [`--angerona-fp=${fpSeed}`] } : {}),
+    // Lo script di protezione (scudi e impronta) gira anche nei riquadri, sempre senza Node.
+    nodeIntegrationInSubFrames: args.length > 0,
+    ...(args.length ? { preload: PAGE_PRELOAD, additionalArguments: args } : {}),
     webSecurity: true,
     allowRunningInsecureContent: false,
     javascript: store.value.javascript,
@@ -295,6 +318,7 @@ function createTab(url, { activate = true, after = null } = {}) {
   wc.on('select-bluetooth-device', (e, _devices, cb) => { e.preventDefault(); cb(''); });
   const tab = {
     id: wc.id, view, title: 'Nuova scheda', url: '', favicon: null, loading: true, blocked: 0,
+    lastGesture: 0, popupNotice: false,
   };
   tabs.set(tab.id, tab);
   const pos = after !== null ? order.indexOf(after) : -1;
@@ -314,8 +338,20 @@ function wireTab(tab) {
   const wc = tab.view.webContents;
   const update = () => sendTabs();
 
-  wc.setWindowOpenHandler(({ url }) => {
-    if (/^(https?|angerona):/.test(url)) createTab(url, { after: tab.id });
+  wc.on('input-event', (_e, ev) => { if (USER_GESTURES.has(ev.type)) tab.lastGesture = Date.now(); });
+  wc.setWindowOpenHandler(({ url, disposition }) => {
+    if (!/^(https?|angerona):/.test(url)) return { action: 'deny' };
+    const opener = wc.getURL();
+    // Blocco dei pop-up come in Chrome e Brave: serve un clic o un tasto appena premuto (una finestra
+    // per gesto), sempre. Con le protezioni attive, le finestre verso indirizzi di pubblicità restano
+    // chiuse anche dopo il clic.
+    const gesture = Date.now() - tab.lastGesture < GESTURE_MS;
+    if (!gesture || privacy.isPopupBlocked(url, opener)) {
+      popupBlocked(tab);
+      return { action: 'deny' };
+    }
+    tab.lastGesture = 0;
+    createTab(url, { after: tab.id, activate: disposition !== 'background-tab' });
     return { action: 'deny' };
   });
   wc.on('will-navigate', (e) => onWillNavigate(e, tab));
@@ -326,6 +362,7 @@ function wireTab(tab) {
   wc.on('did-start-navigation', (d) => {
     if (!d.isMainFrame || d.isSameDocument) return;
     tab.blocked = 0;
+    tab.popupNotice = false;
     tab.favicon = null;
     // Sfondo scuro solo per le pagine interne; i siti senza sfondo restano bianchi e leggibili.
     tab.view.setBackgroundColor(d.url.startsWith('angerona:') ? THEME.page : '#FFFFFF');
@@ -442,6 +479,13 @@ function navigate(input) {
   if (!url || !wc) return;
   wc.loadURL(url).catch(() => {});
   wc.focus();
+}
+
+function popupBlocked(tab) {
+  countBlocked(tab.id);
+  if (tab.popupNotice || tab.id !== activeId) return;
+  tab.popupNotice = true;
+  sendUi('toast', 'Finestra pop-up bloccata');
 }
 
 function countBlocked(wcId) {
@@ -633,6 +677,7 @@ function sendTabs() {
         canBack: h.canGoBack(),
         canForward: h.canGoForward(),
         blocked: t.blocked,
+        shields: /^https?:/.test(url) ? privacy.shieldsActiveFor(url) : true,
         internal: url.startsWith('angerona:') && !errorPage,
         error: errorPage,
         secure: url.startsWith('https:') || (url.startsWith('angerona:') && !errorPage),
@@ -653,6 +698,7 @@ function settingsPayload() {
     filters: privacy.filtersInfo,
     report: report.evaluate(store.value),
     threats: privacy.threatsInfo,
+    cookies: privacy.cookiesInfo,
     autoClearOptions: AUTO_CLEAR_MINUTES,
     version: app.getVersion(),
     engine: `Chromium ${process.versions.chrome}`,
@@ -704,7 +750,11 @@ ipcMain.handle('settings:set', guard(async (input) => {
   await privacy.applyNetwork(settings);
   if (settings.blockTrackers && !privacy.engine) privacy.updateFilters('trackers').then(sendSettings).catch(() => {});
   if (settings.blockThreats && !privacy.engines.threats) privacy.updateFilters('threats').then(sendSettings).catch(() => {});
-  const jsChanged = prev.javascript !== settings.javascript || prev.reduceFingerprint !== settings.reduceFingerprint;
+  if (settings.blockTrackers && settings.blockCookieBanners && !privacy.engines.cookies) {
+    privacy.updateFilters('cookies').then(sendSettings).catch(() => {});
+  }
+  const jsChanged = prev.javascript !== settings.javascript || prev.reduceFingerprint !== settings.reduceFingerprint
+    || prev.blockTrackers !== settings.blockTrackers;
   const restart = prev.hardened !== settings.hardened;
   for (const t of tabs.values()) {
     if (t.view.webContents.getURL().startsWith(HOME)) t.view.webContents.reload();
@@ -744,12 +794,78 @@ ipcMain.handle('net:check', guard(async () => {
 ipcMain.handle('filters:update', guard(async () => {
   try {
     const filters = await privacy.updateFilters('trackers');
+    const cookies = await privacy.updateFilters('cookies').catch(() => privacy.cookiesInfo);
     const threats = await privacy.updateFilters('threats').catch(() => privacy.threatsInfo);
-    return { ok: true, filters, threats };
+    return { ok: true, filters, cookies, threats };
   } catch (err) {
     return { ok: false, error: err.message };
   }
 }));
+
+// ---------- Scudi: regole per le pagine e menu dello scudo ----------
+// Le richieste arrivano dallo script di protezione delle schede (mondo separato, la pagina non lo vede).
+function tabOf(event) {
+  return tabs.get(event.sender.id) || null;
+}
+function topUrlOf(event, fallback) {
+  try { return (event.senderFrame && event.senderFrame.top && event.senderFrame.top.url) || fallback; } catch { return fallback; }
+}
+const strings = (v, max) => (Array.isArray(v) ? v.filter((x) => typeof x === 'string' && x.length < 500).slice(0, max) : []);
+
+ipcMain.on('shields:page', (event, url) => {
+  const empty = { active: false, styles: '', scripts: [] };
+  if (!tabOf(event) || typeof url !== 'string') { event.returnValue = empty; return; }
+  const top = topUrlOf(event, url);
+  if (!privacy.shieldsActiveFor(top)) { event.returnValue = empty; return; }
+  event.returnValue = { active: true, ...privacy.cosmeticsFor(url, top) };
+});
+
+ipcMain.handle('shields:dom', (event, data) => {
+  if (!tabOf(event) || !data || typeof data.url !== 'string') return '';
+  const dom = { classes: strings(data.classes, 5000), ids: strings(data.ids, 5000), hrefs: strings(data.hrefs, 2000) };
+  return privacy.cosmeticsFor(data.url, topUrlOf(event, data.url), dom).styles;
+});
+
+ipcMain.handle('shields:menu', guard((pos) => {
+  const t = tabs.get(activeId);
+  if (!t || !win) return;
+  const url = t.view.webContents.getURL();
+  const web = /^https?:/.test(url);
+  let site = '';
+  try { site = web ? siteOf(url) : ''; } catch { site = ''; }
+  const n = t.blocked;
+  const items = [
+    { label: n === 1 ? '1 elemento bloccato in questa pagina' : `${n.toLocaleString('it-IT')} elementi bloccati in questa pagina`, enabled: false },
+    { type: 'separator' },
+  ];
+  if (!store.value.blockTrackers) {
+    items.push({ label: 'Blocco di pubblicità e tracker spento nelle impostazioni', enabled: false });
+  } else if (site) {
+    items.push({
+      label: `Protezioni attive su ${site}`,
+      type: 'checkbox',
+      checked: privacy.shieldsActiveFor(url),
+      click: () => toggleShields(site, t),
+    });
+  }
+  items.push({ type: 'separator' }, { label: 'Impostazioni di protezione…', click: () => sendUi('open-panel') });
+  const x = Math.round(Number(pos && pos.x) || 0);
+  const y = Math.round(Number(pos && pos.y) || 0);
+  Menu.buildFromTemplate(items).popup({ window: win, x, y });
+}));
+
+/** Spegne o riaccende le protezioni contro pubblicità e tracker per un sito, poi ricarica la scheda. */
+function toggleShields(site, tab) {
+  const off = new Set(store.value.shieldsOff || []);
+  if (off.has(site)) off.delete(site); else off.add(site);
+  const { settings } = sanitize({ shieldsOff: [...off] }, store.value);
+  store.save(settings);
+  privacy.updateSettings(settings);
+  sendUi('toast', off.has(site) ? `Protezioni spente su ${site}` : `Protezioni riattivate su ${site}`);
+  if (tabs.has(tab.id)) tab.view.webContents.reload();
+  sendTabs();
+  sendSettings();
+}
 /** Chiude tutte le schede e cancella cookie, cache, accessi, DNS e dati dei siti. */
 async function clearEverything() {
   fpSeed = crypto.randomBytes(16).toString('hex'); // la nuova scheda avrà già un'impronta nuova
